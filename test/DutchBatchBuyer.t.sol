@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import "./lib/MockToken.sol";
+import "./lib/ReenteringMockToken.sol";
 import "../src/DutchBatchBuyer.sol";
 
 contract DutchBatchBuyerTest is Test {
@@ -18,6 +19,8 @@ contract DutchBatchBuyerTest is Test {
     MockToken token3;
     MockToken token4;
     MockToken[] public tokens;
+
+    
 
     DutchBatchBuyer public dutchBatchBuyer;
 
@@ -154,6 +157,50 @@ contract DutchBatchBuyerTest is Test {
         assertEq(slot0.startTime, block.timestamp);
     }
 
+    function testBuyDeadlinePassedShouldFail() public {
+        mintTokensToBatchBuyer();
+        skip(365 days);
+
+        vm.startPrank(buyer);
+        vm.expectRevert(DutchBatchBuyer.DeadlinePassed.selector);
+        dutchBatchBuyer.buy(assetsAddresses(), assetsReceiver, block.timestamp - 1 days, 1000000e18);
+        vm.stopPrank();
+
+        // Double check tokens haven't moved
+        assertMintBalances(address(dutchBatchBuyer));
+    }
+
+    function testBuyPaymentAmountExceedsMax() public {
+        mintTokensToBatchBuyer();
+
+        vm.startPrank(buyer);
+        vm.expectRevert(DutchBatchBuyer.MaxPaymentTokenAmountExceeded.selector);
+        dutchBatchBuyer.buy(assetsAddresses(), assetsReceiver, block.timestamp + 1 days, START_PRICE / 2);
+        vm.stopPrank();
+
+        // Double check tokens haven't moved
+        assertMintBalances(address(dutchBatchBuyer));
+    }
+
+    function testBuyReenter() public {
+        uint256 mintAmount = 1e18;
+
+        // Setup reentering token
+        ReenteringMockToken reenterToken = new ReenteringMockToken("ReenteringToken", "RET");
+        reenterToken.mint(address(dutchBatchBuyer), mintAmount);
+        reenterToken.setReenterTargetAndData(address(dutchBatchBuyer), abi.encodeWithSelector(dutchBatchBuyer.buy.selector, assetsAddresses(), assetsReceiver, block.timestamp + 1 days, 1000000e18));
+
+        address[] memory assets = new address[](1);
+        assets[0] = address(reenterToken);
+
+        vm.startPrank(buyer);
+        // Token does not bubble up error so this is the expected error on reentry
+        vm.expectRevert("TRANSFER_FAILED");
+        dutchBatchBuyer.buy(assets, assetsReceiver, block.timestamp + 1 days, 1000000e18);
+        vm.stopPrank();
+    }
+
+    // Helper functions -----------------------------------------------------
     function mintTokensToBatchBuyer() public {
         for(uint256 i = 0; i < tokens.length; i++) {
             tokens[i].mint(address(dutchBatchBuyer), 1000000e18 * (i + 1));

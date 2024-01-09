@@ -3,8 +3,9 @@ pragma solidity ^0.8.20;
 
 import {ERC20} from "solmate/tokens/ERC20.sol";
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
+import {ReentrancyGuard} from "solmate/utils/ReentrancyGuard.sol";
 
-contract DutchBatchBuyer {
+contract DutchBatchBuyer is ReentrancyGuard {
     using SafeTransferLib for ERC20;
 
     uint256 constant public MIN_START_PRICE = 1e16; // 0.01
@@ -16,11 +17,13 @@ contract DutchBatchBuyer {
         uint128 startPrice;
         uint64 startTime;
     }
-
     Slot0 internal slot0;
+
+    event Buy(address indexed buyer, address indexed assetsReceiver, uint256 paymentAmount);
 
     error DeadlinePassed();
     error MaxPaymentTokenAmountExceeded();
+
 
     constructor(uint256 startPrice, address paymentToken_, address paymentReceiver_) {
         require(startPrice >= MIN_START_PRICE, "DutchBatchBuyer: start price too low");
@@ -32,8 +35,7 @@ contract DutchBatchBuyer {
     }
 
 
-    // TODO reentry modifier
-    function buy(address[] calldata assets, address assetsReceiver, uint256 deadline, uint256 maxPaymentTokenAmount) external {
+    function buy(address[] calldata assets, address assetsReceiver, uint256 deadline, uint256 maxPaymentTokenAmount) external nonReentrant {
         if(block.timestamp > deadline) revert DeadlinePassed();
 
         Slot0 memory slot0Cache = slot0;
@@ -60,8 +62,9 @@ contract DutchBatchBuyer {
         // Write cache in single write
         slot0 = slot0Cache;
 
-        // TODO emit event
+        emit Buy(msg.sender, assetsReceiver, paymentAmount);
     }
+
 
     function getPriceFromCache(Slot0 memory slot0Cache) internal view returns(uint256){
         uint256 timePassed = block.timestamp - slot0Cache.startTime;
@@ -73,12 +76,13 @@ contract DutchBatchBuyer {
         return slot0Cache.startPrice - slot0Cache.startPrice * timePassed / AUCTION_DURATION;
     }
 
+
     function getPrice() public view returns(uint256){
         return getPriceFromCache(slot0);
     }
 
+
     function getSlot0() public view returns (Slot0 memory) {
         return slot0;
     }
-
 }
