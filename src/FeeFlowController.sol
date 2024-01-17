@@ -5,7 +5,7 @@ import {ERC20} from "solmate/tokens/ERC20.sol";
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 import {ReentrancyGuard} from "solmate/utils/ReentrancyGuard.sol";
 
-contract DutchBatchBuyer is ReentrancyGuard {
+contract FeeFlowController is ReentrancyGuard {
     using SafeTransferLib for ERC20;
 
     uint256 constant public MIN_START_PRICE = 1e16; // 0.01
