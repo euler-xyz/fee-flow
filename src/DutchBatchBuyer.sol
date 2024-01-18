@@ -8,8 +8,8 @@ import {ReentrancyGuard} from "solmate/utils/ReentrancyGuard.sol";
 contract DutchBatchBuyer is ReentrancyGuard {
     using SafeTransferLib for ERC20;
 
-    uint256 constant public MIN_START_PRICE = 1e16; // 0.01
-    uint256 constant public AUCTION_DURATION = 14 days; // Should settle at the half-way point roughly most of the times (7 days)
+    uint256 constant public MIN_START_PRICE = 1e16; // 0.01     better to make it immutable, defined per input param?
+    uint256 constant public AUCTION_DURATION = 14 days; // Should settle at the half-way point roughly most of the times (7 days)    better to make it immutable, defined per input param?
     ERC20 immutable public paymentToken;
     address immutable public paymentReceiver;
 
@@ -27,11 +27,16 @@ contract DutchBatchBuyer is ReentrancyGuard {
 
     constructor(uint256 startPrice, address paymentToken_, address paymentReceiver_) {
         require(startPrice >= MIN_START_PRICE, "DutchBatchBuyer: start price too low");
+        require(paymentReceiver_ != address(this), "DutchBatchBuyer: payment receiver cannot be this contract");
         slot0.startPrice = uint128(startPrice);
         slot0.startTime = uint64(block.timestamp);
 
         paymentToken = ERC20(paymentToken_);
         paymentReceiver = paymentReceiver_;
+
+        // if MIN_START_PRICE and AUCTION_DURATION are defined by input params, one should be aware of this calculation from getPriceFromCache:
+        // slot0Cache.startPrice - slot0Cache.startPrice * timePassed / AUCTION_DURATION;
+        // if startPrice is too low vs AUCTION_DURATION, the price will stay at startPrice and they will drop to 0 at the end of the auction
     }
 
 
@@ -42,7 +47,16 @@ contract DutchBatchBuyer is ReentrancyGuard {
 
         uint256 paymentAmount = getPriceFromCache(slot0Cache);
         if(paymentAmount > maxPaymentTokenAmount) revert MaxPaymentTokenAmountExceeded();
-        paymentToken.safeTransferFrom(msg.sender, paymentReceiver, paymentAmount);
+        if(paymentAmount > 0) paymentToken.safeTransferFrom(msg.sender, paymentReceiver, paymentAmount);
+
+        // idea:
+        // would it make sense to integrate with the EVC to allow msg.sender == EVC and get the real caller from the EVC context?
+        // note that there's no incentive for anyone to transfer the assets to this contract while the auction is live. 
+        // why? because it costs gas and may increase competition for the assets while there's no guarantee that the person paying for gas
+        // will be able to buy those assets. I assume that the buy() function call will always be batched in one transaction with the 
+        // transfers of the assets. considering that, I assume that buyers will be using EVC.batch() to get the assets transferred to this contract
+        // and then the last batch item could be the buy() function call. if integrated with the EVC, no smart contract would be needed to 
+        // participate in the auction
 
         for(uint256 i = 0; i < assets.length; i++) {
             // Transfer full balance to buyer
