@@ -73,7 +73,7 @@ contract FeeFlowController is ReentrancyGuard {
     /// @return paymentAmount The amount of payment tokens transferred for the purchase.
     /// @notice This function performs various checks and transfers the payment tokens to the payment receiver.
     /// It also transfers the assets to the assets receiver and sets up a new auction with an updated initial price.
-    function buy(address[] calldata assets, address assetsReceiver, uint256 deadline, uint256 maxPaymentTokenAmount) external nonReentrant returns(uint256 paymentAmount)) {
+    function buy(address[] calldata assets, address assetsReceiver, uint256 deadline, uint256 maxPaymentTokenAmount) external nonReentrant returns(uint256 paymentAmount) {
         if(block.timestamp > deadline) revert DeadlinePassed();
 
         Slot0 memory slot0Cache = slot0;
