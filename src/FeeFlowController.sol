@@ -6,6 +6,7 @@ import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 import {ReentrancyGuard} from "solmate/utils/ReentrancyGuard.sol";
 
 
+
 /// @title FeeFlowController
 /// @author Euler Labs (https://eulerlabs.com)
 /// @notice Continous back to back dutch auctions selling any asset received by this contract
@@ -76,8 +77,9 @@ contract FeeFlowController is ReentrancyGuard {
         if(block.timestamp > deadline) revert DeadlinePassed();
 
         Slot0 memory slot0Cache = slot0;
-
+        
         paymentAmount = getPriceFromCache(slot0Cache);
+
         if(paymentAmount > maxPaymentTokenAmount) revert MaxPaymentTokenAmountExceeded();
         paymentToken.safeTransferFrom(msg.sender, paymentReceiver, paymentAmount);
 
