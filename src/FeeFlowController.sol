@@ -120,12 +120,14 @@ contract FeeFlowController is ReentrancyGuard {
         return slot0Cache.initPrice - slot0Cache.initPrice * timePassed / epochPeriod;
     }
 
+
     /// @dev Calculates the current price
     /// @return price The current price calculated based on the elapsed time and the initial price.
     /// @notice Uses the internal function `getPriceFromCache` to calculate the current price.
     function getPrice() public view returns(uint256){
         return getPriceFromCache(slot0);
     }
+
 
     /// @dev Retrieves slot0 as a memory struct
     /// @return slot0 The slot0 value as a Slot0 struct
