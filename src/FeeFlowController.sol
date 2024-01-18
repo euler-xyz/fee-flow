@@ -5,33 +5,50 @@ import {ERC20} from "solmate/tokens/ERC20.sol";
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 import {ReentrancyGuard} from "solmate/utils/ReentrancyGuard.sol";
 
-contract DutchBatchBuyer is ReentrancyGuard {
+contract FeeFlowController is ReentrancyGuard {
     using SafeTransferLib for ERC20;
 
-    uint256 constant public MIN_START_PRICE = 1e16; // 0.01
-    uint256 constant public AUCTION_DURATION = 14 days; // Should settle at the half-way point roughly most of the times (7 days)
+    uint256 constant public MIN_EPOCH_PERIOD = 1 hours;
+    uint256 constant public MIN_PRICE_MULTIPLIER = 1.1e18; // Should at least be 110% of settlement price
+    uint256 constant public MIN_MIN_INIT_PRICE = 1e6; // Minimum sane value for init price
+    uint256 constant public PRICE_MULTIPLIER_SCALE = 1e18;
+
     ERC20 immutable public paymentToken;
     address immutable public paymentReceiver;
+    uint256 immutable public epochPeriod;
+    uint256 immutable public priceMultiplier;
+    uint256 immutable public minInitPrice;
 
     struct Slot0 {
-        uint128 startPrice;
+        uint128 initPrice;
         uint64 startTime;
     }
     Slot0 internal slot0;
 
     event Buy(address indexed buyer, address indexed assetsReceiver, uint256 paymentAmount);
 
+    error InitPriceBelowMin();
+    error EpochPeriodBelowMin();
+    error PriceMultiplierBelowMin();
+    error MinInitPriceBelowMin();
     error DeadlinePassed();
     error MaxPaymentTokenAmountExceeded();
 
 
-    constructor(uint256 startPrice, address paymentToken_, address paymentReceiver_) {
-        require(startPrice >= MIN_START_PRICE, "DutchBatchBuyer: start price too low");
-        slot0.startPrice = uint128(startPrice);
+    constructor(uint256 initPrice, address paymentToken_, address paymentReceiver_, uint256 epochPeriod_, uint256 priceMultiplier_, uint256 minInitPrice_) {
+        if(initPrice < minInitPrice_) revert InitPriceBelowMin();
+        if(epochPeriod_ < MIN_EPOCH_PERIOD) revert EpochPeriodBelowMin();
+        if(priceMultiplier_ < MIN_PRICE_MULTIPLIER) revert PriceMultiplierBelowMin();
+        if(minInitPrice_ < MIN_MIN_INIT_PRICE) revert MinInitPriceBelowMin();
+
+        slot0.initPrice = uint128(initPrice);
         slot0.startTime = uint64(block.timestamp);
 
         paymentToken = ERC20(paymentToken_);
         paymentReceiver = paymentReceiver_;
+        epochPeriod = epochPeriod_;
+        priceMultiplier = priceMultiplier_;
+        minInitPrice = minInitPrice_;
     }
 
 
@@ -51,12 +68,12 @@ contract DutchBatchBuyer is ReentrancyGuard {
         }
 
         // Setup new auction
-        uint256 newStartPrice = paymentAmount * 2;
-        if(newStartPrice < MIN_START_PRICE) {
-            newStartPrice = MIN_START_PRICE;
+        uint256 newInitPrice = paymentAmount * priceMultiplier / PRICE_MULTIPLIER_SCALE;
+        if(newInitPrice < minInitPrice) {
+            newInitPrice = minInitPrice;
         }
 
-        slot0Cache.startPrice = uint128(newStartPrice);
+        slot0Cache.initPrice = uint128(newInitPrice);
         slot0Cache.startTime = uint64(block.timestamp);
 
         // Write cache in single write
@@ -69,11 +86,11 @@ contract DutchBatchBuyer is ReentrancyGuard {
     function getPriceFromCache(Slot0 memory slot0Cache) internal view returns(uint256){
         uint256 timePassed = block.timestamp - slot0Cache.startTime;
 
-        if(timePassed > AUCTION_DURATION) {
+        if(timePassed > epochPeriod) {
             return 0;
         }
 
-        return slot0Cache.startPrice - slot0Cache.startPrice * timePassed / AUCTION_DURATION;
+        return slot0Cache.initPrice - slot0Cache.initPrice * timePassed / epochPeriod;
     }
 
 

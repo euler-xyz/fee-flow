@@ -4,10 +4,13 @@ pragma solidity ^0.8.20;
 import "forge-std/Test.sol";
 import "./lib/MockToken.sol";
 import "./lib/ReenteringMockToken.sol";
-import "../src/DutchBatchBuyer.sol";
+import "../src/FeeFlowController.sol";
 
-contract DutchBatchBuyerTest is Test {
-    uint256 constant public START_PRICE = 1e18;
+contract FeeFlowControllerTest is Test {
+    uint256 constant public INIT_PRICE = 1e18;
+    uint256 constant public MIN_INIT_PRICE = 1e6;
+    uint256 constant public EPOCH_PERIOD = 14 days;
+    uint256 constant public PRICE_MULTIPLIER = 2e18;
     
     address public paymentReceiver;
     address public buyer;
@@ -20,9 +23,7 @@ contract DutchBatchBuyerTest is Test {
     MockToken token4;
     MockToken[] public tokens;
 
-    
-
-    DutchBatchBuyer public dutchBatchBuyer;
+    FeeFlowController public feeFlowController;
 
     function setUp() public {
         // Setup addresses
@@ -49,23 +50,24 @@ contract DutchBatchBuyerTest is Test {
         vm.label(address(token4), "token4");
         tokens.push(token4);
 
-        // Deploy DutchBatchBuyer
-        dutchBatchBuyer = new DutchBatchBuyer(START_PRICE, address(paymentToken), paymentReceiver);
+        // Deploy FeeFlowController
+        feeFlowController = new FeeFlowController(INIT_PRICE, address(paymentToken), paymentReceiver, EPOCH_PERIOD, PRICE_MULTIPLIER, MIN_INIT_PRICE);
 
         // Mint payment tokens to buyer
         paymentToken.mint(buyer, 1000000e18);
-        // Approve payment token from buyer to DutchBatchBuyer
+        // Approve payment token from buyer to FeeFlowController
         vm.startPrank(buyer);
-        paymentToken.approve(address(dutchBatchBuyer), type(uint256).max);
+        paymentToken.approve(address(feeFlowController), type(uint256).max);
         vm.stopPrank();
     }
 
     function testConstructor() public {
-        DutchBatchBuyer.Slot0 memory slot0 = dutchBatchBuyer.getSlot0();
-        assertEq(slot0.startPrice, uint128(START_PRICE));
+        FeeFlowController.Slot0 memory slot0 = feeFlowController.getSlot0();
+        assertEq(slot0.initPrice, uint128(INIT_PRICE));
         assertEq(slot0.startTime, block.timestamp);
-        assertEq(address(dutchBatchBuyer.paymentToken()), address(paymentToken));
-        assertEq(dutchBatchBuyer.paymentReceiver(), paymentReceiver);
+        assertEq(address(feeFlowController.paymentToken()), address(paymentToken));
+        assertEq(feeFlowController.paymentReceiver(), paymentReceiver);
+        assertEq(feeFlowController.epochPeriod(), EPOCH_PERIOD);
     }
 
     function testBuyStartOfAuction() public {
@@ -74,25 +76,25 @@ contract DutchBatchBuyerTest is Test {
         uint256 paymentReceiverBalanceBefore = paymentToken.balanceOf(paymentReceiver);
         uint256 buyerBalanceBefore = paymentToken.balanceOf(buyer);
 
-        uint256 expectedPrice = dutchBatchBuyer.getPrice();
+        uint256 expectedPrice = feeFlowController.getPrice();
 
         vm.startPrank(buyer);
-        dutchBatchBuyer.buy(assetsAddresses(), assetsReceiver, block.timestamp + 1 days, 1000000e18);
+        feeFlowController.buy(assetsAddresses(), assetsReceiver, block.timestamp + 1 days, 1000000e18);
         vm.stopPrank();
 
         uint256 paymentReceiverBalanceAfter = paymentToken.balanceOf(paymentReceiver);
         uint256 buyerBalanceAfter = paymentToken.balanceOf(buyer);
-        DutchBatchBuyer.Slot0 memory slot0 = dutchBatchBuyer.getSlot0();
+        FeeFlowController.Slot0 memory slot0 = feeFlowController.getSlot0();
 
         // Assert token balances
-        assert0Balances(address(dutchBatchBuyer));
+        assert0Balances(address(feeFlowController));
         assertMintBalances(assetsReceiver);
-        assertEq(expectedPrice, START_PRICE);
+        assertEq(expectedPrice, INIT_PRICE);
         assertEq(paymentReceiverBalanceAfter, paymentReceiverBalanceBefore + expectedPrice);
         assertEq(buyerBalanceAfter, buyerBalanceBefore - expectedPrice);
 
-        // Assert new auctionState
-        assertEq(slot0.startPrice, uint128(START_PRICE * 2));
+        // Assert new auction state
+        assertEq(slot0.initPrice, uint128(INIT_PRICE * 2));
         assertEq(slot0.startTime, block.timestamp);
     }
 
@@ -103,19 +105,19 @@ contract DutchBatchBuyerTest is Test {
         uint256 buyerBalanceBefore = paymentToken.balanceOf(buyer);
 
         // Skip to end of auction and then some
-        skip(dutchBatchBuyer.AUCTION_DURATION() + 1 days);
-        uint256 expectedPrice = dutchBatchBuyer.getPrice();
+        skip(EPOCH_PERIOD + 1 days);
+        uint256 expectedPrice = feeFlowController.getPrice();
 
         vm.startPrank(buyer);
-        dutchBatchBuyer.buy(assetsAddresses(), assetsReceiver, block.timestamp + 1 days, 1000000e18);
+        feeFlowController.buy(assetsAddresses(), assetsReceiver, block.timestamp + 1 days, 1000000e18);
         vm.stopPrank();
 
         uint256 paymentReceiverBalanceAfter = paymentToken.balanceOf(paymentReceiver);
         uint256 buyerBalanceAfter = paymentToken.balanceOf(buyer);
-        DutchBatchBuyer.Slot0 memory slot0 = dutchBatchBuyer.getSlot0();
+        FeeFlowController.Slot0 memory slot0 = feeFlowController.getSlot0();
 
         // Assert token balances
-        assert0Balances(address(dutchBatchBuyer));
+        assert0Balances(address(feeFlowController));
         assertMintBalances(assetsReceiver);
         // Should have paid 0
         assertEq(expectedPrice, 0);
@@ -123,7 +125,7 @@ contract DutchBatchBuyerTest is Test {
         assertEq(buyerBalanceAfter, buyerBalanceBefore);
 
         // Assert new auctionState
-        assertEq(slot0.startPrice, dutchBatchBuyer.MIN_START_PRICE());
+        assertEq(slot0.initPrice, MIN_INIT_PRICE);
         assertEq(slot0.startTime, block.timestamp);
     }
 
@@ -134,26 +136,26 @@ contract DutchBatchBuyerTest is Test {
         uint256 buyerBalanceBefore = paymentToken.balanceOf(buyer);
 
         // Skip to middle of auction
-        skip(dutchBatchBuyer.AUCTION_DURATION() / 2);
-        uint256 expectedPrice = dutchBatchBuyer.getPrice();
+        skip(EPOCH_PERIOD / 2);
+        uint256 expectedPrice = feeFlowController.getPrice();
 
         vm.startPrank(buyer);
-        dutchBatchBuyer.buy(assetsAddresses(), assetsReceiver, block.timestamp + 1 days, 1000000e18);
+        feeFlowController.buy(assetsAddresses(), assetsReceiver, block.timestamp + 1 days, 1000000e18);
         vm.stopPrank();
 
         uint256 paymentReceiverBalanceAfter = paymentToken.balanceOf(paymentReceiver);
         uint256 buyerBalanceAfter = paymentToken.balanceOf(buyer);
-        DutchBatchBuyer.Slot0 memory slot0 = dutchBatchBuyer.getSlot0();
+        FeeFlowController.Slot0 memory slot0 = feeFlowController.getSlot0();
 
         // Assert token balances
-        assert0Balances(address(dutchBatchBuyer));
+        assert0Balances(address(feeFlowController));
         assertMintBalances(assetsReceiver);
-        assertEq(expectedPrice, START_PRICE / 2);
+        assertEq(expectedPrice, INIT_PRICE / 2);
         assertEq(paymentReceiverBalanceAfter, paymentReceiverBalanceBefore + expectedPrice);
         assertEq(buyerBalanceAfter, buyerBalanceBefore - expectedPrice);
 
         // Assert new auctionState
-        assertEq(slot0.startPrice, uint128(START_PRICE));
+        assertEq(slot0.initPrice, uint128(INIT_PRICE));
         assertEq(slot0.startTime, block.timestamp);
     }
 
@@ -162,24 +164,24 @@ contract DutchBatchBuyerTest is Test {
         skip(365 days);
 
         vm.startPrank(buyer);
-        vm.expectRevert(DutchBatchBuyer.DeadlinePassed.selector);
-        dutchBatchBuyer.buy(assetsAddresses(), assetsReceiver, block.timestamp - 1 days, 1000000e18);
+        vm.expectRevert(FeeFlowController.DeadlinePassed.selector);
+        feeFlowController.buy(assetsAddresses(), assetsReceiver, block.timestamp - 1 days, 1000000e18);
         vm.stopPrank();
 
         // Double check tokens haven't moved
-        assertMintBalances(address(dutchBatchBuyer));
+        assertMintBalances(address(feeFlowController));
     }
 
     function testBuyPaymentAmountExceedsMax() public {
         mintTokensToBatchBuyer();
 
         vm.startPrank(buyer);
-        vm.expectRevert(DutchBatchBuyer.MaxPaymentTokenAmountExceeded.selector);
-        dutchBatchBuyer.buy(assetsAddresses(), assetsReceiver, block.timestamp + 1 days, START_PRICE / 2);
+        vm.expectRevert(FeeFlowController.MaxPaymentTokenAmountExceeded.selector);
+        feeFlowController.buy(assetsAddresses(), assetsReceiver, block.timestamp + 1 days, INIT_PRICE / 2);
         vm.stopPrank();
 
         // Double check tokens haven't moved
-        assertMintBalances(address(dutchBatchBuyer));
+        assertMintBalances(address(feeFlowController));
     }
 
     function testBuyReenter() public {
@@ -187,8 +189,8 @@ contract DutchBatchBuyerTest is Test {
 
         // Setup reentering token
         ReenteringMockToken reenterToken = new ReenteringMockToken("ReenteringToken", "RET");
-        reenterToken.mint(address(dutchBatchBuyer), mintAmount);
-        reenterToken.setReenterTargetAndData(address(dutchBatchBuyer), abi.encodeWithSelector(dutchBatchBuyer.buy.selector, assetsAddresses(), assetsReceiver, block.timestamp + 1 days, 1000000e18));
+        reenterToken.mint(address(feeFlowController), mintAmount);
+        reenterToken.setReenterTargetAndData(address(feeFlowController), abi.encodeWithSelector(feeFlowController.buy.selector, assetsAddresses(), assetsReceiver, block.timestamp + 1 days, 1000000e18));
 
         address[] memory assets = new address[](1);
         assets[0] = address(reenterToken);
@@ -196,14 +198,14 @@ contract DutchBatchBuyerTest is Test {
         vm.startPrank(buyer);
         // Token does not bubble up error so this is the expected error on reentry
         vm.expectRevert("TRANSFER_FAILED");
-        dutchBatchBuyer.buy(assets, assetsReceiver, block.timestamp + 1 days, 1000000e18);
+        feeFlowController.buy(assets, assetsReceiver, block.timestamp + 1 days, 1000000e18);
         vm.stopPrank();
     }
 
     // Helper functions -----------------------------------------------------
     function mintTokensToBatchBuyer() public {
         for(uint256 i = 0; i < tokens.length; i++) {
-            tokens[i].mint(address(dutchBatchBuyer), 1000000e18 * (i + 1));
+            tokens[i].mint(address(feeFlowController), 1000000e18 * (i + 1));
         }
     }
 
@@ -223,7 +225,7 @@ contract DutchBatchBuyerTest is Test {
         return addresses;
     }
 
-    function assetsBalances(address who) public returns(uint256[] memory result) {
+    function assetsBalances(address who) public view returns(uint256[] memory result) {
         result = new uint256[](tokens.length);
 
         for(uint256 i = 0; i < tokens.length; i ++) {
@@ -245,7 +247,7 @@ contract DutchBatchBuyerTest is Test {
     function assert0Balances(address who) public {
         for(uint256 i = 0; i < tokens.length; i ++) {
             uint256 balance = tokens[i].balanceOf(who);
-            assertEq(tokens[i].balanceOf(who), 0);
+            assertEq(balance, 0);
         }
     }
 
