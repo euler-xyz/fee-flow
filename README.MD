@@ -1,7 +1,6 @@
-# Dutch Batch Buyer
+# Fee Flow
 
 Generic contract for auctioning multiple tokens in a single auction.
-
 
 ## How to run
 
