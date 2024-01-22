@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
+import "evc/EthereumVaultConnector.sol";
 import "./lib/MockToken.sol";
 import "./lib/ReenteringMockToken.sol";
 import "../src/FeeFlowController.sol";
@@ -23,6 +24,7 @@ contract FeeFlowControllerTest is Test {
     MockToken token4;
     MockToken[] public tokens;
 
+    IEVC public evc;
     FeeFlowController public feeFlowController;
 
     function setUp() public {
@@ -50,8 +52,11 @@ contract FeeFlowControllerTest is Test {
         vm.label(address(token4), "token4");
         tokens.push(token4);
 
+        // Deploy EVC
+        evc = new EthereumVaultConnector();
+
         // Deploy FeeFlowController
-        feeFlowController = new FeeFlowController(INIT_PRICE, address(paymentToken), paymentReceiver, EPOCH_PERIOD, PRICE_MULTIPLIER, MIN_INIT_PRICE);
+        feeFlowController = new FeeFlowController(address(evc), INIT_PRICE, address(paymentToken), paymentReceiver, EPOCH_PERIOD, PRICE_MULTIPLIER, MIN_INIT_PRICE);
 
         // Mint payment tokens to buyer
         paymentToken.mint(buyer, 1000000e18);
