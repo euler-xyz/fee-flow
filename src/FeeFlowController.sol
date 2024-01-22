@@ -4,13 +4,14 @@ pragma solidity ^0.8.20;
 import {ERC20} from "solmate/tokens/ERC20.sol";
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 import {ReentrancyGuard} from "solmate/utils/ReentrancyGuard.sol";
+import {MinimalEVCClient} from "./MinimalEVCClient.sol";
 
 
 
 /// @title FeeFlowController
 /// @author Euler Labs (https://eulerlabs.com)
 /// @notice Continous back to back dutch auctions selling any asset received by this contract
-contract FeeFlowController is ReentrancyGuard {
+contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
     using SafeTransferLib for ERC20;
 
     uint256 constant public MIN_EPOCH_PERIOD = 1 hours;
@@ -48,7 +49,7 @@ contract FeeFlowController is ReentrancyGuard {
     /// @param priceMultiplier_ The multiplier for adjusting the price from one epoch to the next.
     /// @param minInitPrice_ The minimum allowed initial price for an epoch.
     /// @notice This constructor performs parameter validation and sets the initial values for the contract.
-    constructor(uint256 initPrice, address paymentToken_, address paymentReceiver_, uint256 epochPeriod_, uint256 priceMultiplier_, uint256 minInitPrice_) {
+    constructor(address evc, uint256 initPrice, address paymentToken_, address paymentReceiver_, uint256 epochPeriod_, uint256 priceMultiplier_, uint256 minInitPrice_) MinimalEVCClient(evc) {
         if(initPrice < minInitPrice_) revert InitPriceBelowMin();
         if(epochPeriod_ < MIN_EPOCH_PERIOD) revert EpochPeriodBelowMin();
         if(priceMultiplier_ < MIN_PRICE_MULTIPLIER) revert PriceMultiplierBelowMin();
@@ -77,11 +78,12 @@ contract FeeFlowController is ReentrancyGuard {
         if(block.timestamp > deadline) revert DeadlinePassed();
 
         Slot1 memory slot1Cache = slot1;
+        address sender = _msgSender();
         
         paymentAmount = getPriceFromCache(slot1Cache);
 
         if(paymentAmount > maxPaymentTokenAmount) revert MaxPaymentTokenAmountExceeded();
-        paymentToken.safeTransferFrom(msg.sender, paymentReceiver, paymentAmount);
+        paymentToken.safeTransferFrom(sender, paymentReceiver, paymentAmount);
 
         for(uint256 i = 0; i < assets.length; i++) {
             // Transfer full balance to buyer
@@ -101,7 +103,7 @@ contract FeeFlowController is ReentrancyGuard {
         // Write cache in single write
         slot1 = slot1Cache;
 
-        emit Buy(msg.sender, assetsReceiver, paymentAmount);
+        emit Buy(sender, assetsReceiver, paymentAmount);
 
         return paymentAmount;
     }
