@@ -19,3 +19,4 @@ lcov.info
 .certora*
 
 node_modules/
+.vscode/
