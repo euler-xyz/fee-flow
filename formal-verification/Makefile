@@ -3,6 +3,7 @@ default: help
 SRC   := ../src
 DST   := patched
 DIFF  := diff
+LIBS := $(shell find $(SRC)/lib -type f)
 SRCS  := $(shell find $(SRC) -type f)
 DSTS  := $(shell find $(DST) -type f)
 DIFFS := $(shell find $(DIFF) -type f)
@@ -15,7 +16,6 @@ apply: $(DST) $(patsubst $(DIFF)/%.patch,$(DST)/%,$(subst _,/,$(DIFFS)))
 $(DST): FORCE
 	@rm -rf $@
 	@cp -r $(SRC) $@
-
 # Update a solidity file in the $DST directory using the corresponding patch
 $(DST)/%.sol: FORCE
 	@echo Applying patch to $@

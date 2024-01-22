@@ -16,3 +16,6 @@ out/
 # Coverage files
 coverage/
 lcov.info
+.certora*
+
+node_modules/

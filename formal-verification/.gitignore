@@ -10,3 +10,4 @@ resource_errors.json
 certora_debug_log.txt
 .zip-output-url.txt
 smt
+node_modules
