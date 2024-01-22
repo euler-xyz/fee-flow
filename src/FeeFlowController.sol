@@ -76,9 +76,9 @@ contract FeeFlowController is ReentrancyGuard {
     function buy(address[] calldata assets, address assetsReceiver, uint256 deadline, uint256 maxPaymentTokenAmount) external nonReentrant returns(uint256 paymentAmount) {
         if(block.timestamp > deadline) revert DeadlinePassed();
 
-        Slot1 memory slot0Cache = slot1;
+        Slot1 memory slot1Cache = slot1;
         
-        paymentAmount = getPriceFromCache(slot0Cache);
+        paymentAmount = getPriceFromCache(slot1Cache);
 
         if(paymentAmount > maxPaymentTokenAmount) revert MaxPaymentTokenAmountExceeded();
         paymentToken.safeTransferFrom(msg.sender, paymentReceiver, paymentAmount);
@@ -95,11 +95,11 @@ contract FeeFlowController is ReentrancyGuard {
             newInitPrice = minInitPrice;
         }
 
-        slot0Cache.initPrice = uint128(newInitPrice);
-        slot0Cache.startTime = uint64(block.timestamp);
+        slot1Cache.initPrice = uint128(newInitPrice);
+        slot1Cache.startTime = uint64(block.timestamp);
 
         // Write cache in single write
-        slot1 = slot0Cache;
+        slot1 = slot1Cache;
 
         emit Buy(msg.sender, assetsReceiver, paymentAmount);
 
@@ -108,18 +108,18 @@ contract FeeFlowController is ReentrancyGuard {
 
     
     /// @dev Retrieves the current price from the cache based on the elapsed time since the start of the epoch.
-    /// @param slot0Cache The Slot1 struct containing the initial price and start time of the epoch.
+    /// @param slot1Cache The Slot1 struct containing the initial price and start time of the epoch.
     /// @return price The current price calculated based on the elapsed time and the initial price.
     /// @notice This function calculates the current price by subtracting a fraction of the initial price based on the elapsed time.
     // If the elapsed time exceeds the epoch period, the price will be 0.
-    function getPriceFromCache(Slot1 memory slot0Cache) internal view returns(uint256){
-        uint256 timePassed = block.timestamp - slot0Cache.startTime;
+    function getPriceFromCache(Slot1 memory slot1Cache) internal view returns(uint256){
+        uint256 timePassed = block.timestamp - slot1Cache.startTime;
 
         if(timePassed > epochPeriod) {
             return 0;
         }
 
-        return slot0Cache.initPrice - slot0Cache.initPrice * timePassed / epochPeriod;
+        return slot1Cache.initPrice - slot1Cache.initPrice * timePassed / epochPeriod;
     }
 
 
