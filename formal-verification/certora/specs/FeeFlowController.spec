@@ -1,7 +1,9 @@
-import "methods/IFeeFlowController.spec"
+import "methods/IFeeFlowController.spec";
 
-rule checkFeeFlowController {
-	// test
-	assert true;
+rule reachability(method f)
+{
+	env e;
+	calldataarg args;
+	f(e,args);
+	satisfy true, "a non-reverting path through this method was found";
 }
-
