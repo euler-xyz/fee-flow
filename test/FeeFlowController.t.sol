@@ -67,9 +67,9 @@ contract FeeFlowControllerTest is Test {
     }
 
     function testConstructor() public {
-        FeeFlowController.Slot0 memory slot0 = feeFlowController.getSlot0();
-        assertEq(slot0.initPrice, uint128(INIT_PRICE));
-        assertEq(slot0.startTime, block.timestamp);
+        FeeFlowController.Slot1 memory slot1 = feeFlowController.getSlot1();
+        assertEq(slot1.initPrice, uint128(INIT_PRICE));
+        assertEq(slot1.startTime, block.timestamp);
         assertEq(address(feeFlowController.paymentToken()), address(paymentToken));
         assertEq(feeFlowController.paymentReceiver(), paymentReceiver);
         assertEq(feeFlowController.epochPeriod(), EPOCH_PERIOD);
@@ -89,7 +89,7 @@ contract FeeFlowControllerTest is Test {
 
         uint256 paymentReceiverBalanceAfter = paymentToken.balanceOf(paymentReceiver);
         uint256 buyerBalanceAfter = paymentToken.balanceOf(buyer);
-        FeeFlowController.Slot0 memory slot0 = feeFlowController.getSlot0();
+        FeeFlowController.Slot1 memory slot1 = feeFlowController.getSlot1();
 
         // Assert token balances
         assert0Balances(address(feeFlowController));
@@ -99,8 +99,8 @@ contract FeeFlowControllerTest is Test {
         assertEq(buyerBalanceAfter, buyerBalanceBefore - expectedPrice);
 
         // Assert new auction state
-        assertEq(slot0.initPrice, uint128(INIT_PRICE * 2));
-        assertEq(slot0.startTime, block.timestamp);
+        assertEq(slot1.initPrice, uint128(INIT_PRICE * 2));
+        assertEq(slot1.startTime, block.timestamp);
     }
 
     function testBuyEndOfAuction() public {
@@ -119,7 +119,7 @@ contract FeeFlowControllerTest is Test {
 
         uint256 paymentReceiverBalanceAfter = paymentToken.balanceOf(paymentReceiver);
         uint256 buyerBalanceAfter = paymentToken.balanceOf(buyer);
-        FeeFlowController.Slot0 memory slot0 = feeFlowController.getSlot0();
+        FeeFlowController.Slot1 memory slot1 = feeFlowController.getSlot1();
 
         // Assert token balances
         assert0Balances(address(feeFlowController));
@@ -130,8 +130,8 @@ contract FeeFlowControllerTest is Test {
         assertEq(buyerBalanceAfter, buyerBalanceBefore);
 
         // Assert new auctionState
-        assertEq(slot0.initPrice, MIN_INIT_PRICE);
-        assertEq(slot0.startTime, block.timestamp);
+        assertEq(slot1.initPrice, MIN_INIT_PRICE);
+        assertEq(slot1.startTime, block.timestamp);
     }
 
     function testBuyMiddleOfAuction() public {
@@ -150,7 +150,7 @@ contract FeeFlowControllerTest is Test {
 
         uint256 paymentReceiverBalanceAfter = paymentToken.balanceOf(paymentReceiver);
         uint256 buyerBalanceAfter = paymentToken.balanceOf(buyer);
-        FeeFlowController.Slot0 memory slot0 = feeFlowController.getSlot0();
+        FeeFlowController.Slot1 memory slot1 = feeFlowController.getSlot1();
 
         // Assert token balances
         assert0Balances(address(feeFlowController));
@@ -160,8 +160,8 @@ contract FeeFlowControllerTest is Test {
         assertEq(buyerBalanceAfter, buyerBalanceBefore - expectedPrice);
 
         // Assert new auctionState
-        assertEq(slot0.initPrice, uint128(INIT_PRICE));
-        assertEq(slot0.startTime, block.timestamp);
+        assertEq(slot1.initPrice, uint128(INIT_PRICE));
+        assertEq(slot1.startTime, block.timestamp);
     }
 
     function testBuyDeadlinePassedShouldFail() public {

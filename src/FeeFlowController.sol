@@ -25,11 +25,11 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
     uint256 immutable public priceMultiplier;
     uint256 immutable public minInitPrice;
 
-    struct Slot0 {
+    struct Slot1 {
         uint128 initPrice;
         uint64 startTime;
     }
-    Slot0 internal slot0;
+    Slot1 internal slot1;
 
     event Buy(address indexed buyer, address indexed assetsReceiver, uint256 paymentAmount);
 
@@ -55,8 +55,8 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
         if(priceMultiplier_ < MIN_PRICE_MULTIPLIER) revert PriceMultiplierBelowMin();
         if(minInitPrice_ < MIN_MIN_INIT_PRICE) revert MinInitPriceBelowMin();
 
-        slot0.initPrice = uint128(initPrice);
-        slot0.startTime = uint64(block.timestamp);
+        slot1.initPrice = uint128(initPrice);
+        slot1.startTime = uint64(block.timestamp);
 
         paymentToken = ERC20(paymentToken_);
         paymentReceiver = paymentReceiver_;
@@ -77,10 +77,10 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
     function buy(address[] calldata assets, address assetsReceiver, uint256 deadline, uint256 maxPaymentTokenAmount) external nonReentrant returns(uint256 paymentAmount) {
         if(block.timestamp > deadline) revert DeadlinePassed();
 
-        Slot0 memory slot0Cache = slot0;
+        Slot1 memory slot1Cache = slot1;
         address sender = _msgSender();
         
-        paymentAmount = getPriceFromCache(slot0Cache);
+        paymentAmount = getPriceFromCache(slot1Cache);
 
         if(paymentAmount > maxPaymentTokenAmount) revert MaxPaymentTokenAmountExceeded();
         paymentToken.safeTransferFrom(sender, paymentReceiver, paymentAmount);
@@ -97,11 +97,11 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
             newInitPrice = minInitPrice;
         }
 
-        slot0Cache.initPrice = uint128(newInitPrice);
-        slot0Cache.startTime = uint64(block.timestamp);
+        slot1Cache.initPrice = uint128(newInitPrice);
+        slot1Cache.startTime = uint64(block.timestamp);
 
         // Write cache in single write
-        slot0 = slot0Cache;
+        slot1 = slot1Cache;
 
         emit Buy(sender, assetsReceiver, paymentAmount);
 
@@ -110,18 +110,18 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
 
     
     /// @dev Retrieves the current price from the cache based on the elapsed time since the start of the epoch.
-    /// @param slot0Cache The Slot0 struct containing the initial price and start time of the epoch.
+    /// @param slot1Cache The Slot1 struct containing the initial price and start time of the epoch.
     /// @return price The current price calculated based on the elapsed time and the initial price.
     /// @notice This function calculates the current price by subtracting a fraction of the initial price based on the elapsed time.
     // If the elapsed time exceeds the epoch period, the price will be 0.
-    function getPriceFromCache(Slot0 memory slot0Cache) internal view returns(uint256){
-        uint256 timePassed = block.timestamp - slot0Cache.startTime;
+    function getPriceFromCache(Slot1 memory slot1Cache) internal view returns(uint256){
+        uint256 timePassed = block.timestamp - slot1Cache.startTime;
 
         if(timePassed > epochPeriod) {
             return 0;
         }
 
-        return slot0Cache.initPrice - slot0Cache.initPrice * timePassed / epochPeriod;
+        return slot1Cache.initPrice - slot1Cache.initPrice * timePassed / epochPeriod;
     }
 
 
@@ -129,13 +129,13 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
     /// @return price The current price calculated based on the elapsed time and the initial price.
     /// @notice Uses the internal function `getPriceFromCache` to calculate the current price.
     function getPrice() public view returns(uint256){
-        return getPriceFromCache(slot0);
+        return getPriceFromCache(slot1);
     }
 
 
-    /// @dev Retrieves slot0 as a memory struct
-    /// @return slot0 The slot0 value as a Slot0 struct
-    function getSlot0() public view returns (Slot0 memory) {
-        return slot0;
+    /// @dev Retrieves slot1 as a memory struct
+    /// @return slot1 The slot1 value as a Slot1 struct
+    function getSlot1() public view returns (Slot1 memory) {
+        return slot1;
     }
 }
