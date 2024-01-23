@@ -12,4 +12,16 @@ contract FeeFlowControllerHarness is FeeFlowController {
         uint256 priceMultiplier_,
         uint256 minInitPrice_
     ) FeeFlowController(initPrice, paymentToken_, paymentReceiver_, epochPeriod_, priceMultiplier_, minInitPrice_) {}
+
+    function getInitPrice() external view returns (uint256) {
+        return slot0.initPrice;
+    }
+
+    function getStartTime() external view returns (uint256) {
+        return slot0.startTime;
+    }
+
+    function getMinInitPrice() external pure returns (uint256) {
+        return MIN_MIN_INIT_PRICE;
+    }
 }
