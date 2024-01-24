@@ -1,7 +1,17 @@
 import "methods/IFeeFlowController.spec";
 import "helpers/erc20.spec";
 
-rule minPriceNeverBelowMIN_PRICE()
+using FeeFlowControllerHarness as feeFlowController;
+
+rule reachability(method f)
+{
+	env e;
+	calldataarg args;
+	feeFlowController.f(e,args);
+	satisfy true, "a non-reverting path through this method was found";
+}
+
+rule check_initPriceAlwaysMoreThenMinInitPrice()
 {
 	// todo: verify the constructor args separately and that they revert if they are not valid
 	uint initPriceStart = getInitPrice();
@@ -33,3 +43,9 @@ rule minPriceNeverBelowMIN_PRICE()
 	uint minInitPrice = getMinInitPrice();
 	assert initPrice >= minInitPrice, "initPrice >= minInitPrice";
 } 
+
+// rule check_newPriceAlwaysAtLeast10PercentMoreThenPrvious {
+
+// }
+
+// check no reentrancy
