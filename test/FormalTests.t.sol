@@ -52,6 +52,7 @@ contract FormalTests is Test {
         paymentToken.mint(buyer, type(uint256).max);
     }
 
+    // test case: https://prover.certora.com/output/13/f34cd2a033ae472f83537c188335959a/?anonymousKey=31a6b84792ad495dcba17968bf24137aff9f9e65
 	function testExampleReverting() public {
         vm.startPrank(buyer);
 		uint initPriceStart = 0xe8cabb37565e37162aed68e9984797cd;
