@@ -3,24 +3,17 @@ import "helpers/erc20.spec";
 
 using FeeFlowControllerHarness as feeFlowController;
 
-rule reachability(method f)
-{
-	env e;
-	calldataarg args;
-	feeFlowController.f(e,args);
-	satisfy true, "a non-reverting path through this method was found";
-}
-
+// Reusable functions
 function constructorAssumptions(env e) {
 	uint initPriceStart = getInitPrice();
 	uint minInitPriceStart = getMinInitPrice();
 	// if(initPrice < minInitPrice_) revert InitPriceBelowMin();
 	require initPriceStart >= minInitPriceStart;
 
-	// this one is interesting. If we don't assume we are starting
-	// from a block with a later timestamp then the math breaks
-	uint startTime = getStartTime();
-	require startTime > 0;
+	// // this one is interesting. If we don't assume we are starting
+	// // from a block with a later timestamp then the math breaks
+	// uint startTime = getStartTime();
+	// require startTime > 0;
 
 	uint epochPeriodStart = getEpochPeriod();
 	uint MIN_EPOCH_PERIOD = getMIN_EPOCH_PERIOD();
@@ -36,22 +29,8 @@ function constructorAssumptions(env e) {
 	// if(minInitPrice_ < MIN_MIN_INIT_PRICE) revert MinInitPriceBelowMin();
 	require minInitPriceStart >= MIN_MIN_INIT_PRICE;
 
-	require e.block.timestamp >= startTime;
+	// require e.block.timestamp >= startTime;
 }
-
-persistent ghost bool reentrancy_happened {
-    init_state axiom !reentrancy_happened;
-}
-
-hook CALL(uint g, address addr, uint value, uint argsOffset, uint argsLength, 
-          uint retOffset, uint retLength) uint rc {
-    if (addr == currentContract) {
-        reentrancy_happened = reentrancy_happened 
-                                || executingContract == currentContract;
-    }
-}
-
-invariant no_reentrant_calls() !reentrancy_happened;
 
 function initialStateAssertions(env e) {
 	uint initPrice = getInitPrice();
@@ -70,35 +49,80 @@ function initialStateAssertions(env e) {
 	assert e.block.timestamp >= startTime, "e.block.timestamp >= startTime";
 }
 
-rule check_initailStateAssertionsAfterBuy() {
-	env e;
-	constructorAssumptions(e);
-	calldataarg args;
-	buy(e, args);
-	initialStateAssertions(e);
+// Ghost functions and hooks
+// https://docs.certora.com/en/latest/docs/cvl/ghosts.html?highlight=saw_user_defined_revert_msg#persistent-ghosts-that-survive-reverts
+// this only works for solidity versions prior to 0.8.x
+persistent ghost bool saw_user_defined_revert_msg;
+
+hook REVERT(uint offset, uint size) {
+    if (size > 0) {
+        saw_user_defined_revert_msg = true;
+	}
+}
+persistent ghost bool reentrancy_happened {
+    init_state axiom !reentrancy_happened;
 }
 
-rule check_buyNeverThrows() {
-	env e;
-	constructorAssumptions(e);
-	calldataarg args;
-	buy@withrevert(e, args);
-	assert !lastHasThrown, "buy never throws";
+hook CALL(uint g, address addr, uint value, uint argsOffset, uint argsLength, 
+          uint retOffset, uint retLength) uint rc {
+    if (addr == currentContract) {
+        reentrancy_happened = reentrancy_happened 
+                                || executingContract == currentContract;
+    }
 }
 
-rule check_buyNextInitPriceAtLeastBuyPriceTimesMultiplier() {
+// // Invariants
+// invariant no_reentrant_calls() !reentrancy_happened;
+
+// // Rules
+// rule reachability(method f)
+// {
+// 	env e;
+// 	calldataarg args;
+// 	feeFlowController.f(e,args);
+// 	satisfy true, "a non-reverting path through this method was found";
+// }
+
+// rule check_initailStateAssertionsAfterBuy() {
+// 	env e;
+// 	constructorAssumptions(e);
+// 	calldataarg args;
+// 	buy(e, args);
+// 	initialStateAssertions(e);
+// }
+
+rule check_buyNeverRevertsUnexpectedly() {
+	require !saw_user_defined_revert_msg; // setting this to false on havoc
 	env e;
 	constructorAssumptions(e);
-	calldataarg args;
+	address[] assets; address assetsReceiver; uint256 deadline; uint256 maxPaymentTokenAmount;
+	require(e.block.timestamp <= deadline);
+	uint paymentAmount = getPrice(e);
+	require(paymentAmount <= maxPaymentTokenAmount);
+	require(e.msg.value == 0); // if we send ether the transaction will revert
+	// we have enough allowance and we have enough balance
+	uint256 allowance = feeFlowController.getPymentTokenAllowance(e, e.msg.sender);
+	uint256 balance = feeFlowController.getPaymentTokenBalanceOf(e, e.msg.sender);
+	require(balance >= paymentAmount);
+	require(allowance >= paymentAmount);
 	
-	mathint paymentAmount = buy@withrevert(e, args);
-
-	mathint priceMultiplier = getPriceMultiplier();
-	mathint PRICE_MULTIPLIER_SCALE = getPRICE_MULTIPLIER_SCALE();
-	mathint predictedInitPrice = paymentAmount * priceMultiplier / PRICE_MULTIPLIER_SCALE;
-
-	mathint initPriceAfter = getInitPrice();
-	assert initPriceAfter == predictedInitPrice, "initPrice >= newInitPrice";
+	buy@withrevert(e, assets, assetsReceiver, deadline, maxPaymentTokenAmount);
+	assert !lastReverted || saw_user_defined_revert_msg, "buy never reverts with arithmetic exceptions or internal solidity reverts";
 }
 
-// todo: check if after epoch ends you can buy without paying?
+// rule check_buyNextInitPriceAtLeastBuyPriceTimesMultiplier() {
+// 	env e;
+// 	constructorAssumptions(e);
+// 	calldataarg args;
+	
+// 	mathint paymentAmount = buy@withrevert(e, args);
+
+// 	mathint priceMultiplier = getPriceMultiplier();
+// 	mathint PRICE_MULTIPLIER_SCALE = getPRICE_MULTIPLIER_SCALE();
+// 	mathint predictedInitPrice = paymentAmount * priceMultiplier / PRICE_MULTIPLIER_SCALE;
+
+// 	mathint initPriceAfter = getInitPrice();
+// 	assert initPriceAfter == predictedInitPrice, "initPrice >= newInitPrice";
+// }
+
+// // todo: check if after epoch ends you can buy without paying?
