@@ -53,7 +53,6 @@ hook CALL(uint g, address addr, uint value, uint argsOffset, uint argsLength,
 
 invariant no_reentrant_calls() !reentrancy_happened;
 
-// make sure we never violate the initial state assumptions
 function initialStateAssertions(env e) {
 	uint initPrice = getInitPrice();
 	uint minInitPrice = getMinInitPrice();
@@ -87,7 +86,6 @@ rule check_buyNeverThrows() {
 	assert !lastHasThrown, "buy never throws";
 }
 
-// todo: check if after epoch ends you can buy without paying?
 rule check_buyNextInitPriceAtLeastBuyPriceTimesMultiplier() {
 	env e;
 	constructorAssumptions(e);
@@ -102,3 +100,5 @@ rule check_buyNextInitPriceAtLeastBuyPriceTimesMultiplier() {
 	mathint initPriceAfter = getInitPrice();
 	assert initPriceAfter == predictedInitPrice, "initPrice >= newInitPrice";
 }
+
+// todo: check if after epoch ends you can buy without paying?
