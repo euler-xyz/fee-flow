@@ -10,11 +10,6 @@ function constructorAssumptions(env e) {
 	// if(initPrice < minInitPrice_) revert InitPriceBelowMin();
 	require initPriceStart >= minInitPriceStart;
 
-	// // this one is interesting. If we don't assume we are starting
-	// // from a block with a later timestamp then the math breaks
-	// uint startTime = getStartTime();
-	// require startTime > 0;
-
 	uint epochPeriodStart = getEpochPeriod();
 	uint MIN_EPOCH_PERIOD = getMIN_EPOCH_PERIOD();
 	// if(epochPeriod_ < MIN_EPOCH_PERIOD) revert EpochPeriodBelowMin();
@@ -128,5 +123,3 @@ rule check_buyNextInitPriceAtLeastBuyPriceTimesMultiplier() {
 	mathint initPriceAfter = getInitPrice();
 	assert initPriceAfter == predictedInitPrice, "initPrice >= newInitPrice";
 }
-
-// todo: check if after epoch ends you can buy without paying?
