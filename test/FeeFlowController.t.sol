@@ -60,11 +60,14 @@ contract FeeFlowControllerTest is Test {
 
     function testConstructor() public {
         FeeFlowController.Slot1 memory slot1 = feeFlowController.getSlot1();
+        assertEq(address(feeFlowController.evc()), address(evc));
         assertEq(slot1.initPrice, uint128(INIT_PRICE));
         assertEq(slot1.startTime, block.timestamp);
         assertEq(address(feeFlowController.paymentToken()), address(paymentToken));
         assertEq(feeFlowController.paymentReceiver(), paymentReceiver);
         assertEq(feeFlowController.epochPeriod(), EPOCH_PERIOD);
+        assertEq(feeFlowController.priceMultiplier(), PRICE_MULTIPLIER);
+        assertEq(feeFlowController.minInitPrice(), MIN_INIT_PRICE);
     }
 
     function testBuyStartOfAuction() public {
