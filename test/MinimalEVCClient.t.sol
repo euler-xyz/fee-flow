@@ -9,8 +9,8 @@ contract MinimalEVCClientTest is Test {
     MockEVC public evc;
     TestableMinimalEVCClient public client;
 
-    address caller = address(bytes20(keccak256("caller")));
-    address onBehalfOf = address(bytes20(keccak256("onBehalfOf")));
+    address caller = makeAddr("caller");
+    address onBehalfOf = makeAddr("onBehalfOf");
 
     function setUp() public {
         evc = new MockEVC();

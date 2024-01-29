@@ -13,9 +13,9 @@ contract FeeFlowControllerTest is Test {
     uint256 constant public EPOCH_PERIOD = 14 days;
     uint256 constant public PRICE_MULTIPLIER = 2e18;
     
-    address public paymentReceiver = makeAddr(name);;
-    address public buyer;
-    address public assetsReceiver;
+    address public paymentReceiver = makeAddr("paymentReceiver");
+    address public buyer = makeAddr("buyer");
+    address public assetsReceiver = makeAddr("assetsReceiver");
 
     MockToken paymentToken;
     MockToken token1;
@@ -28,14 +28,6 @@ contract FeeFlowControllerTest is Test {
     FeeFlowController public feeFlowController;
 
     function setUp() public {
-        // Setup addresses
-        paymentReceiver = address(uint160(uint256(keccak256("paymentReceiver"))));
-        vm.label(paymentReceiver, "paymentReceiver");
-        buyer = address(uint160(uint256(keccak256("buyer"))));
-        vm.label(buyer, "buyer");
-        assetsReceiver = address(uint160(uint256(keccak256("asssetReceiver"))));
-        vm.label(assetsReceiver, "assetsReceiver");
-
         // Deploy tokens
         paymentToken = new MockToken("Payment Token", "PAY");
         vm.label(address(paymentToken), "paymentToken");
