@@ -37,6 +37,7 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
     error EpochPeriodBelowMin();
     error PriceMultiplierBelowMin();
     error MinInitPriceBelowMin();
+    error MinInitPriceExceedsUint128();
     error DeadlinePassed();
     error EmptyAssets();
     error MaxPaymentTokenAmountExceeded();
@@ -55,6 +56,7 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
         if(epochPeriod_ < MIN_EPOCH_PERIOD) revert EpochPeriodBelowMin();
         if(priceMultiplier_ < MIN_PRICE_MULTIPLIER) revert PriceMultiplierBelowMin();
         if(minInitPrice_ < MIN_MIN_INIT_PRICE) revert MinInitPriceBelowMin();
+        if(minInitPrice_ > type(uint128).max) revert MinInitPriceExceedsUint128();
 
         slot1.initPrice = uint128(initPrice);
         slot1.startTime = uint64(block.timestamp);

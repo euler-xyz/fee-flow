@@ -13,7 +13,7 @@ contract FeeFlowControllerTest is Test {
     uint256 constant public EPOCH_PERIOD = 14 days;
     uint256 constant public PRICE_MULTIPLIER = 2e18;
     
-    address public paymentReceiver;
+    address public paymentReceiver = makeAddr(name);;
     address public buyer;
     address public assetsReceiver;
 
