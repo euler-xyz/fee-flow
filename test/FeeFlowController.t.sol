@@ -5,6 +5,7 @@ import "forge-std/Test.sol";
 import "evc/EthereumVaultConnector.sol";
 import "./lib/MockToken.sol";
 import "./lib/ReenteringMockToken.sol";
+import "./lib/PredictAddress.sol";
 import "../src/FeeFlowController.sol";
 
 contract FeeFlowControllerTest is Test {
@@ -13,9 +14,9 @@ contract FeeFlowControllerTest is Test {
     uint256 constant public EPOCH_PERIOD = 14 days;
     uint256 constant public PRICE_MULTIPLIER = 2e18;
     
-    address public paymentReceiver;
-    address public buyer;
-    address public assetsReceiver;
+    address public paymentReceiver = makeAddr("paymentReceiver");
+    address public buyer = makeAddr("buyer");
+    address public assetsReceiver = makeAddr("assetsReceiver");
 
     MockToken paymentToken;
     MockToken token1;
@@ -28,14 +29,6 @@ contract FeeFlowControllerTest is Test {
     FeeFlowController public feeFlowController;
 
     function setUp() public {
-        // Setup addresses
-        paymentReceiver = address(uint160(uint256(keccak256("paymentReceiver"))));
-        vm.label(paymentReceiver, "paymentReceiver");
-        buyer = address(uint160(uint256(keccak256("buyer"))));
-        vm.label(buyer, "buyer");
-        assetsReceiver = address(uint160(uint256(keccak256("asssetReceiver"))));
-        vm.label(assetsReceiver, "assetsReceiver");
-
         // Deploy tokens
         paymentToken = new MockToken("Payment Token", "PAY");
         vm.label(address(paymentToken), "paymentToken");
@@ -68,11 +61,58 @@ contract FeeFlowControllerTest is Test {
 
     function testConstructor() public {
         FeeFlowController.Slot1 memory slot1 = feeFlowController.getSlot1();
+        assertEq(address(feeFlowController.evc()), address(evc));
         assertEq(slot1.initPrice, uint128(INIT_PRICE));
         assertEq(slot1.startTime, block.timestamp);
         assertEq(address(feeFlowController.paymentToken()), address(paymentToken));
         assertEq(feeFlowController.paymentReceiver(), paymentReceiver);
         assertEq(feeFlowController.epochPeriod(), EPOCH_PERIOD);
+        assertEq(feeFlowController.priceMultiplier(), PRICE_MULTIPLIER);
+        assertEq(feeFlowController.minInitPrice(), MIN_INIT_PRICE);
+    }
+
+    function testConstructorInitPriceBelowMin() public {
+        vm.expectRevert(FeeFlowController.InitPriceBelowMin.selector);
+        new FeeFlowController(address(evc), MIN_INIT_PRICE - 1, address(paymentToken), paymentReceiver, EPOCH_PERIOD, PRICE_MULTIPLIER, MIN_INIT_PRICE);
+    }
+
+    function testConstructorEpochPeriodBelowMin() public {
+        uint256 minEpochPeriod = feeFlowController.MIN_EPOCH_PERIOD();
+        vm.expectRevert(FeeFlowController.EpochPeriodBelowMin.selector);
+        new FeeFlowController(address(evc), INIT_PRICE, address(paymentToken), paymentReceiver, minEpochPeriod - 1, PRICE_MULTIPLIER, MIN_INIT_PRICE);
+    }
+
+    function testConstructorEpochPeriodExceedsMax() public {
+        uint256 maxEpochPeriod = feeFlowController.MAX_EPOCH_PERIOD();
+        vm.expectRevert(FeeFlowController.EpochPeriodExceedsMax.selector);
+        new FeeFlowController(address(evc), INIT_PRICE, address(paymentToken), paymentReceiver, maxEpochPeriod + 1, PRICE_MULTIPLIER, MIN_INIT_PRICE);
+    }
+
+    function testConstructorPriceMultiplierBelowMin() public {
+        uint256 minPriceMultiplier = feeFlowController.MIN_PRICE_MULTIPLIER();
+        vm.expectRevert(FeeFlowController.PriceMultiplierBelowMin.selector);
+        new FeeFlowController(address(evc), INIT_PRICE, address(paymentToken), paymentReceiver, EPOCH_PERIOD, minPriceMultiplier - 1, MIN_INIT_PRICE);
+    }
+
+    function testConstructorMinInitPriceBelowMin() public {
+        uint256 absMinInitPrice = feeFlowController.ABS_MIN_INIT_PRICE();
+        vm.expectRevert(FeeFlowController.MinInitPriceBelowMin.selector);
+        new FeeFlowController(address(evc), INIT_PRICE, address(paymentToken), paymentReceiver, EPOCH_PERIOD, PRICE_MULTIPLIER, absMinInitPrice - 1);
+    }
+
+    function testConstructorMinInitPriceExceedsUint128() public {
+        vm.expectRevert(FeeFlowController.MinInitPriceExceedsUint128.selector);
+        new FeeFlowController(address(evc), uint256(type(uint128).max) + 2, address(paymentToken), paymentReceiver, EPOCH_PERIOD, PRICE_MULTIPLIER, uint256(type(uint128).max) + 1);
+    }
+
+    function testConstructorPaymentReceiverIsThis() public {
+        address deployer = makeAddr("deployer");
+        address expectedAddress = PredictAddress.calc(deployer, 0);
+
+        vm.startPrank(deployer);
+        vm.expectRevert(FeeFlowController.PaymentReceiverIsThis.selector);
+        new FeeFlowController(address(evc), INIT_PRICE, address(paymentToken), expectedAddress, EPOCH_PERIOD, PRICE_MULTIPLIER, MIN_INIT_PRICE);
+        vm.stopPrank();
     }
 
     function testBuyStartOfAuction() public {
@@ -171,6 +211,18 @@ contract FeeFlowControllerTest is Test {
         vm.startPrank(buyer);
         vm.expectRevert(FeeFlowController.DeadlinePassed.selector);
         feeFlowController.buy(assetsAddresses(), assetsReceiver, block.timestamp - 1 days, 1000000e18);
+        vm.stopPrank();
+
+        // Double check tokens haven't moved
+        assertMintBalances(address(feeFlowController));
+    }
+
+    function testBuyEmptyAssetsShouldFail() public {
+        mintTokensToBatchBuyer();
+
+        vm.startPrank(buyer);
+        vm.expectRevert(FeeFlowController.EmptyAssets.selector);
+        feeFlowController.buy(new address[](0), assetsReceiver, block.timestamp + 1 days, 1000000e18);
         vm.stopPrank();
 
         // Double check tokens haven't moved

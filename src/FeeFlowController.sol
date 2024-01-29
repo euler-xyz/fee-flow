@@ -15,8 +15,9 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
     using SafeTransferLib for ERC20;
 
     uint256 constant public MIN_EPOCH_PERIOD = 1 hours;
+    uint256 constant public MAX_EPOCH_PERIOD = 365 days;
     uint256 constant public MIN_PRICE_MULTIPLIER = 1.1e18; // Should at least be 110% of settlement price
-    uint256 constant public MIN_MIN_INIT_PRICE = 1e6; // Minimum sane value for init price
+    uint256 constant public ABS_MIN_INIT_PRICE = 1e6; // Minimum sane value for init price
     uint256 constant public PRICE_MULTIPLIER_SCALE = 1e18;
 
     ERC20 immutable public paymentToken;
@@ -35,10 +36,14 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
 
     error InitPriceBelowMin();
     error EpochPeriodBelowMin();
+    error EpochPeriodExceedsMax();
     error PriceMultiplierBelowMin();
     error MinInitPriceBelowMin();
+    error MinInitPriceExceedsUint128();
     error DeadlinePassed();
+    error EmptyAssets();
     error MaxPaymentTokenAmountExceeded();
+    error PaymentReceiverIsThis();
 
     
     /// @dev Initializes the FeeFlowController contract with the specified parameters.
@@ -52,8 +57,11 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
     constructor(address evc, uint256 initPrice, address paymentToken_, address paymentReceiver_, uint256 epochPeriod_, uint256 priceMultiplier_, uint256 minInitPrice_) MinimalEVCClient(evc) {
         if(initPrice < minInitPrice_) revert InitPriceBelowMin();
         if(epochPeriod_ < MIN_EPOCH_PERIOD) revert EpochPeriodBelowMin();
+        if(epochPeriod_ > MAX_EPOCH_PERIOD) revert EpochPeriodExceedsMax();
         if(priceMultiplier_ < MIN_PRICE_MULTIPLIER) revert PriceMultiplierBelowMin();
-        if(minInitPrice_ < MIN_MIN_INIT_PRICE) revert MinInitPriceBelowMin();
+        if(minInitPrice_ < ABS_MIN_INIT_PRICE) revert MinInitPriceBelowMin();
+        if(minInitPrice_ > type(uint128).max) revert MinInitPriceExceedsUint128();
+        if(paymentReceiver_ == address(this)) revert PaymentReceiverIsThis();
 
         slot1.initPrice = uint128(initPrice);
         slot1.startTime = uint64(block.timestamp);
@@ -76,6 +84,7 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
     /// It also transfers the assets to the assets receiver and sets up a new auction with an updated initial price.
     function buy(address[] calldata assets, address assetsReceiver, uint256 deadline, uint256 maxPaymentTokenAmount) external nonReentrant returns(uint256 paymentAmount) {
         if(block.timestamp > deadline) revert DeadlinePassed();
+        if(assets.length == 0) revert EmptyAssets();
 
         Slot1 memory slot1Cache = slot1;
         address sender = _msgSender();
