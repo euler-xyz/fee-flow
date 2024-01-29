@@ -15,7 +15,7 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
     using SafeTransferLib for ERC20;
 
     uint256 constant public MIN_EPOCH_PERIOD = 1 hours;
-    uint256 constant public MAX_EPOCH_PERIOD = 1 years;
+    uint256 constant public MAX_EPOCH_PERIOD = 365 days;
     uint256 constant public MIN_PRICE_MULTIPLIER = 1.1e18; // Should at least be 110% of settlement price
     uint256 constant public ABS_MIN_INIT_PRICE = 1e6; // Minimum sane value for init price
     uint256 constant public PRICE_MULTIPLIER_SCALE = 1e18;
@@ -43,6 +43,7 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
     error DeadlinePassed();
     error EmptyAssets();
     error MaxPaymentTokenAmountExceeded();
+    error PaymentReceiverIsThis();
 
     
     /// @dev Initializes the FeeFlowController contract with the specified parameters.
@@ -60,6 +61,7 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
         if(priceMultiplier_ < MIN_PRICE_MULTIPLIER) revert PriceMultiplierBelowMin();
         if(minInitPrice_ < ABS_MIN_INIT_PRICE) revert MinInitPriceBelowMin();
         if(minInitPrice_ > type(uint128).max) revert MinInitPriceExceedsUint128();
+        if(paymentReceiver_ == address(this)) revert PaymentReceiverIsThis();
 
         slot1.initPrice = uint128(initPrice);
         slot1.startTime = uint64(block.timestamp);
