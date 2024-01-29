@@ -5,6 +5,7 @@ import "forge-std/Test.sol";
 import "evc/EthereumVaultConnector.sol";
 import "./lib/MockToken.sol";
 import "./lib/ReenteringMockToken.sol";
+import "./lib/PredictAddress.sol";
 import "../src/FeeFlowController.sol";
 
 contract FeeFlowControllerTest is Test {
@@ -68,6 +69,50 @@ contract FeeFlowControllerTest is Test {
         assertEq(feeFlowController.epochPeriod(), EPOCH_PERIOD);
         assertEq(feeFlowController.priceMultiplier(), PRICE_MULTIPLIER);
         assertEq(feeFlowController.minInitPrice(), MIN_INIT_PRICE);
+    }
+
+    function testConstructorInitPriceBelowMin() public {
+        vm.expectRevert(FeeFlowController.InitPriceBelowMin.selector);
+        new FeeFlowController(address(evc), MIN_INIT_PRICE - 1, address(paymentToken), paymentReceiver, EPOCH_PERIOD, PRICE_MULTIPLIER, MIN_INIT_PRICE);
+    }
+
+    function testConstructorEpochPeriodBelowMin() public {
+        uint256 minEpochPeriod = feeFlowController.MIN_EPOCH_PERIOD();
+        vm.expectRevert(FeeFlowController.EpochPeriodBelowMin.selector);
+        new FeeFlowController(address(evc), INIT_PRICE, address(paymentToken), paymentReceiver, minEpochPeriod - 1, PRICE_MULTIPLIER, MIN_INIT_PRICE);
+    }
+
+    function testConstructorEpochPeriodExceedsMax() public {
+        uint256 maxEpochPeriod = feeFlowController.MAX_EPOCH_PERIOD();
+        vm.expectRevert(FeeFlowController.EpochPeriodExceedsMax.selector);
+        new FeeFlowController(address(evc), INIT_PRICE, address(paymentToken), paymentReceiver, maxEpochPeriod + 1, PRICE_MULTIPLIER, MIN_INIT_PRICE);
+    }
+
+    function testConstructorPriceMultiplierBelowMin() public {
+        uint256 minPriceMultiplier = feeFlowController.MIN_PRICE_MULTIPLIER();
+        vm.expectRevert(FeeFlowController.PriceMultiplierBelowMin.selector);
+        new FeeFlowController(address(evc), INIT_PRICE, address(paymentToken), paymentReceiver, EPOCH_PERIOD, minPriceMultiplier - 1, MIN_INIT_PRICE);
+    }
+
+    function testConstructorMinInitPriceBelowMin() public {
+        uint256 absMinInitPrice = feeFlowController.ABS_MIN_INIT_PRICE();
+        vm.expectRevert(FeeFlowController.MinInitPriceBelowMin.selector);
+        new FeeFlowController(address(evc), INIT_PRICE, address(paymentToken), paymentReceiver, EPOCH_PERIOD, PRICE_MULTIPLIER, absMinInitPrice - 1);
+    }
+
+    function testConstructorMinInitPriceExceedsUint128() public {
+        vm.expectRevert(FeeFlowController.MinInitPriceExceedsUint128.selector);
+        new FeeFlowController(address(evc), uint256(type(uint128).max) + 2, address(paymentToken), paymentReceiver, EPOCH_PERIOD, PRICE_MULTIPLIER, uint256(type(uint128).max) + 1);
+    }
+
+    function testConstructorPaymentReceiverIsThis() public {
+        address deployer = makeAddr("deployer");
+        address expectedAddress = PredictAddress.calc(deployer, 0);
+
+        vm.startPrank(deployer);
+        vm.expectRevert(FeeFlowController.PaymentReceiverIsThis.selector);
+        new FeeFlowController(address(evc), INIT_PRICE, address(paymentToken), expectedAddress, EPOCH_PERIOD, PRICE_MULTIPLIER, MIN_INIT_PRICE);
+        vm.stopPrank();
     }
 
     function testBuyStartOfAuction() public {
