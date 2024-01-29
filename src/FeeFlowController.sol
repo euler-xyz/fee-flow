@@ -38,6 +38,7 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
     error PriceMultiplierBelowMin();
     error MinInitPriceBelowMin();
     error DeadlinePassed();
+    error EmptyAssets();
     error MaxPaymentTokenAmountExceeded();
 
     
@@ -76,6 +77,7 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
     /// It also transfers the assets to the assets receiver and sets up a new auction with an updated initial price.
     function buy(address[] calldata assets, address assetsReceiver, uint256 deadline, uint256 maxPaymentTokenAmount) external nonReentrant returns(uint256 paymentAmount) {
         if(block.timestamp > deadline) revert DeadlinePassed();
+        if(assets.length == 0) revert EmptyAssets();
 
         Slot1 memory slot1Cache = slot1;
         address sender = _msgSender();

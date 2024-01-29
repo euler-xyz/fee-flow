@@ -177,6 +177,18 @@ contract FeeFlowControllerTest is Test {
         assertMintBalances(address(feeFlowController));
     }
 
+    function testBuyEmptyAssetsShouldFail() public {
+        mintTokensToBatchBuyer();
+
+        vm.startPrank(buyer);
+        vm.expectRevert(FeeFlowController.EmptyAssets.selector);
+        feeFlowController.buy(new address[](0), assetsReceiver, block.timestamp + 1 days, 1000000e18);
+        vm.stopPrank();
+
+        // Double check tokens haven't moved
+        assertMintBalances(address(feeFlowController));
+    }
+
     function testBuyPaymentAmountExceedsMax() public {
         mintTokensToBatchBuyer();
 
