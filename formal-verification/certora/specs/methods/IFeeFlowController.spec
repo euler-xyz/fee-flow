@@ -1,6 +1,10 @@
 methods {
-	function buy(address[] calldata assets, address assetsReceiver, uint256 deadline, uint256 maxPaymentTokenAmount) external returns(uint256);
+	function buy(address[] assets, address assetsReceiver, uint256 deadline, uint256 maxPaymentTokenAmount) external returns(uint256) => HAVOC_ECF; // nonReentrant summary
     function getPrice() external returns(uint256);
+    function paymentReceiver() external returns(address) envfree => CONSTANT;
+    // state requires of internal/private variables
+    function reentrancyMock() external envfree;
+
     // view helpers
     function getPymentTokenAllowance(address spender) external returns (uint256);
     function getPaymentTokenBalanceOf(address account) external returns (uint256);

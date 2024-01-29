@@ -52,13 +52,13 @@ function initialStateAssertions(env e) {
 // Ghost functions and hooks
 // https://docs.certora.com/en/latest/docs/cvl/ghosts.html?highlight=saw_user_defined_revert_msg#persistent-ghosts-that-survive-reverts
 // this only works for solidity versions prior to 0.8.x
-persistent ghost bool saw_user_defined_revert_msg;
+// persistent ghost bool saw_user_defined_revert_msg;
 
-hook REVERT(uint offset, uint size) {
-    if (size > 0) {
-        saw_user_defined_revert_msg = true;
-	}
-}
+// hook REVERT(uint offset, uint size) {
+//     if (size > 0) {
+//         saw_user_defined_revert_msg = true;
+// 	}
+// }
 persistent ghost bool reentrancy_happened {
     init_state axiom !reentrancy_happened;
 }
@@ -71,58 +71,62 @@ hook CALL(uint g, address addr, uint value, uint argsOffset, uint argsLength,
     }
 }
 
-// // Invariants
-// invariant no_reentrant_calls() !reentrancy_happened;
+// Invariants
+invariant no_reentrant_calls() !reentrancy_happened;
 
-// // Rules
-// rule reachability(method f)
-// {
-// 	env e;
-// 	calldataarg args;
-// 	feeFlowController.f(e,args);
-// 	satisfy true, "a non-reverting path through this method was found";
-// }
+// Rules
+rule reachability(method f)
+{
+	env e;
+	calldataarg args;
+	feeFlowController.f(e,args);
+	satisfy true, "a non-reverting path through this method was found";
+}
 
-// rule check_initailStateAssertionsAfterBuy() {
-// 	env e;
-// 	constructorAssumptions(e);
-// 	calldataarg args;
-// 	buy(e, args);
-// 	initialStateAssertions(e);
-// }
-
-rule check_buyNeverRevertsUnexpectedly() {
-	require !saw_user_defined_revert_msg; // setting this to false on havoc
+rule check_initailStateAssertionsAfterBuy() {
 	env e;
 	constructorAssumptions(e);
+	calldataarg args;
+	buy(e, args);
+	initialStateAssertions(e);
+}
+
+rule check_buyNeverRevertsUnexpectedly() {
+	env e;
+	constructorAssumptions(e);
+	reentrancyMock();
 	address[] assets; address assetsReceiver; uint256 deadline; uint256 maxPaymentTokenAmount;
+	uint initPriceStart = getInitPrice();
+	require(maxPaymentTokenAmount > initPriceStart);
 	require(e.block.timestamp <= deadline);
 	uint paymentAmount = getPrice(e);
-	require(paymentAmount <= maxPaymentTokenAmount);
+	require(paymentAmount <= maxPaymentTokenAmount && paymentAmount > 0);
 	require(e.msg.value == 0); // if we send ether the transaction will revert
 	// we have enough allowance and we have enough balance
 	uint256 allowance = feeFlowController.getPymentTokenAllowance(e, e.msg.sender);
 	uint256 balance = feeFlowController.getPaymentTokenBalanceOf(e, e.msg.sender);
-	require(balance >= paymentAmount);
-	require(allowance >= paymentAmount);
-	
+	address receiver = feeFlowController.paymentReceiver();
+	uint256 receiverBalance = feeFlowController.getPaymentTokenBalanceOf(e, receiver);
+	require(balance >= paymentAmount && balance > 0 && allowance >= paymentAmount && allowance > 0);
+	mathint afterBalance =  receiverBalance + paymentAmount;
+	require(afterBalance < max_uint256);
 	buy@withrevert(e, assets, assetsReceiver, deadline, maxPaymentTokenAmount);
-	assert !lastReverted || saw_user_defined_revert_msg, "buy never reverts with arithmetic exceptions or internal solidity reverts";
+	assert !lastReverted, "buy never reverts with arithmetic exceptions or internal solidity reverts";
 }
 
-// rule check_buyNextInitPriceAtLeastBuyPriceTimesMultiplier() {
-// 	env e;
-// 	constructorAssumptions(e);
-// 	calldataarg args;
+rule check_buyNextInitPriceAtLeastBuyPriceTimesMultiplier() {
+	env e;
+	constructorAssumptions(e);
+	calldataarg args;
 	
-// 	mathint paymentAmount = buy@withrevert(e, args);
+	mathint paymentAmount = buy@withrevert(e, args);
 
-// 	mathint priceMultiplier = getPriceMultiplier();
-// 	mathint PRICE_MULTIPLIER_SCALE = getPRICE_MULTIPLIER_SCALE();
-// 	mathint predictedInitPrice = paymentAmount * priceMultiplier / PRICE_MULTIPLIER_SCALE;
+	mathint priceMultiplier = getPriceMultiplier();
+	mathint PRICE_MULTIPLIER_SCALE = getPRICE_MULTIPLIER_SCALE();
+	mathint predictedInitPrice = paymentAmount * priceMultiplier / PRICE_MULTIPLIER_SCALE;
 
-// 	mathint initPriceAfter = getInitPrice();
-// 	assert initPriceAfter == predictedInitPrice, "initPrice >= newInitPrice";
-// }
+	mathint initPriceAfter = getInitPrice();
+	assert initPriceAfter == predictedInitPrice, "initPrice >= newInitPrice";
+}
 
-// // todo: check if after epoch ends you can buy without paying?
+// todo: check if after epoch ends you can buy without paying?

@@ -13,6 +13,10 @@ contract FeeFlowControllerHarness is FeeFlowController {
         uint256 minInitPrice_
     ) FeeFlowController(initPrice, paymentToken_, paymentReceiver_, epochPeriod_, priceMultiplier_, minInitPrice_) {}
 
+    function reentrancyMock() external nonReentrant {
+        // this makes sure we are setting the reentrancy guard correctly
+    }
+
     function getPymentTokenAllowance(address spender) external view returns (uint256) {
         return paymentToken.allowance(address(this), spender);
     }
