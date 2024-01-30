@@ -1,0 +1,57 @@
+--- ../src/FeeFlowController.sol	2024-01-30 14:17:26
++++ patched/FeeFlowController.sol	2024-01-30 17:04:51
+@@ -17,6 +17,8 @@
+     uint256 constant public MIN_EPOCH_PERIOD = 1 hours;
+     uint256 constant public MAX_EPOCH_PERIOD = 365 days;
+     uint256 constant public MIN_PRICE_MULTIPLIER = 1.1e18; // Should at least be 110% of settlement price
++    uint256 constant public MAX_SANE_PRICE_MULTIPLIER = 10000 * 1e18; // Maximum sane value for price multiplier = 10_000x
++    uint256 constant public ABS_MAX_INIT_PRICE = type(uint128).max; // Maximum sane value for init price
+     uint256 constant public ABS_MIN_INIT_PRICE = 1e6; // Minimum sane value for init price
+     uint256 constant public PRICE_MULTIPLIER_SCALE = 1e18;
+ 
+@@ -35,9 +37,11 @@
+     event Buy(address indexed buyer, address indexed assetsReceiver, uint256 paymentAmount);
+ 
+     error InitPriceBelowMin();
++    error InitPriceAboveMax();
+     error EpochPeriodBelowMin();
+     error EpochPeriodExceedsMax();
+     error PriceMultiplierBelowMin();
++    error PriceMultiplierAboveMax();
+     error MinInitPriceBelowMin();
+     error MinInitPriceExceedsUint128();
+     error DeadlinePassed();
+@@ -59,8 +63,10 @@
+         if(epochPeriod_ < MIN_EPOCH_PERIOD) revert EpochPeriodBelowMin();
+         if(epochPeriod_ > MAX_EPOCH_PERIOD) revert EpochPeriodExceedsMax();
+         if(priceMultiplier_ < MIN_PRICE_MULTIPLIER) revert PriceMultiplierBelowMin();
++        if(priceMultiplier_ > MAX_SANE_PRICE_MULTIPLIER) revert PriceMultiplierAboveMax();
+         if(minInitPrice_ < ABS_MIN_INIT_PRICE) revert MinInitPriceBelowMin();
+-        if(minInitPrice_ > type(uint128).max) revert MinInitPriceExceedsUint128();
++        if(minInitPrice_ > ABS_MAX_INIT_PRICE) revert MinInitPriceExceedsUint128();
++        if(initPrice > ABS_MAX_INIT_PRICE) revert InitPriceAboveMax();
+         if(paymentReceiver_ == address(this)) revert PaymentReceiverIsThis();
+ 
+         slot1.initPrice = uint128(initPrice);
+@@ -102,11 +108,18 @@
+ 
+         // Setup new auction
+         uint256 newInitPrice = paymentAmount * priceMultiplier / PRICE_MULTIPLIER_SCALE;
+-        if(newInitPrice < minInitPrice) {
+-            newInitPrice = minInitPrice;
++        
++        if(newInitPrice > ABS_MAX_INIT_PRICE) {
++            newInitPrice = ABS_MAX_INIT_PRICE;
+         }
+ 
+-        slot1Cache.initPrice = uint128(newInitPrice);
++        uint128 newInitPriceCasted = uint128(newInitPrice);
++        
++        if(newInitPriceCasted < minInitPrice) {
++            newInitPriceCasted = uint128(minInitPrice);
++        }
++
++        slot1Cache.initPrice = newInitPriceCasted;
+         slot1Cache.startTime = uint64(block.timestamp);
+ 
+         // Write cache in single write

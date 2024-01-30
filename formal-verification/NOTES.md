@@ -9,7 +9,3 @@
 4. (INFO) Fee on transfer tokens might cause the emit of incorrect event amounts. Something to keep in mind.
 
 5. (INFO) for gas optimization you can transfer the whole balance -1 wei to keep the slot non-zero. This will keep the gas cost constant and more predictable as well.
-
-? what happens after period expires?
-
-6. It seems to me that after a period expires you can get the the assets for free. If that happens anything after that point that goes to the contract can be fetched for free. Not sure if that is expected behavior.

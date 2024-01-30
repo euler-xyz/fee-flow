@@ -1,0 +1,16 @@
+--- ../src/MinimalEVCClient.sol	2024-01-29 17:02:40
++++ patched/MinimalEVCClient.sol	2024-01-30 16:56:02
+@@ -19,11 +19,7 @@
+     function _msgSender() internal view returns (address) {
+         address sender = msg.sender;
+ 
+-        if (sender == address(evc)) {
+-            (sender,) = evc.getCurrentOnBehalfOfAccount(address(0));
+-        }
+-
+         return sender;
+     }
+ 
+-}
+\ No newline at end of file
++}

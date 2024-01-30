@@ -5,20 +5,40 @@ import "../../patched/FeeFlowController.sol";
 
 contract FeeFlowControllerHarness is FeeFlowController {
     constructor(
+        address evc,
         uint256 initPrice,
         address paymentToken_,
         address paymentReceiver_,
         uint256 epochPeriod_,
         uint256 priceMultiplier_,
         uint256 minInitPrice_
-    ) FeeFlowController(initPrice, paymentToken_, paymentReceiver_, epochPeriod_, priceMultiplier_, minInitPrice_) {}
+    )
+        FeeFlowController(evc, initPrice, paymentToken_, paymentReceiver_, epochPeriod_, priceMultiplier_, minInitPrice_)
+    {}
+
+    function getAddressThis() external view returns (address) {
+        return address(this);
+    }
 
     function reentrancyMock() external nonReentrant {
         // this makes sure we are setting the reentrancy guard correctly
     }
 
-    function getPymentTokenAllowance(address spender) external view returns (uint256) {
-        return paymentToken.allowance(address(this), spender);
+    function getEVC() external view returns (address) {
+        return address(evc);
+    }
+
+    // function getMsgSender() external view returns (address) {
+    //     return _msgSender();
+    // }
+
+    function getTokenBalanceOf(address _token, address _account) external view returns (uint256) {
+        ERC20 token = ERC20(_token);
+        return token.balanceOf(_account);
+    }
+
+    function getPaymentTokenAllowance(address owner) external view returns (uint256) {
+        return paymentToken.allowance(owner, address(this));
     }
 
     function getPaymentTokenBalanceOf(address account) external view returns (uint256) {
@@ -26,11 +46,11 @@ contract FeeFlowControllerHarness is FeeFlowController {
     }
 
     function getInitPrice() external view returns (uint256) {
-        return slot0.initPrice;
+        return slot1.initPrice;
     }
 
     function getStartTime() external view returns (uint256) {
-        return slot0.startTime;
+        return slot1.startTime;
     }
 
     // address immutable public paymentReceiver;
@@ -59,17 +79,25 @@ contract FeeFlowControllerHarness is FeeFlowController {
     }
     // uint256 constant public MIN_PRICE_MULTIPLIER = 1.1e18; // Should at least be 110% of settlement price
 
+    function getMAX_EPOCH_PERIOD() external pure returns (uint256) {
+        return MAX_EPOCH_PERIOD;
+    }
+
     function getMIN_PRICE_MULTIPLIER() external pure returns (uint256) {
         return MIN_PRICE_MULTIPLIER;
     }
     // uint256 constant public MIN_MIN_INIT_PRICE = 1e6; // Minimum sane value for init price
 
-    function getMIN_MIN_INIT_PRICE() external pure returns (uint256) {
-        return MIN_MIN_INIT_PRICE;
+    function getABS_MIN_INIT_PRICE() external pure returns (uint256) {
+        return ABS_MIN_INIT_PRICE;
     }
     // uint256 constant public PRICE_MULTIPLIER_SCALE = 1e18;
 
     function getPRICE_MULTIPLIER_SCALE() external pure returns (uint256) {
         return PRICE_MULTIPLIER_SCALE;
+    }
+
+    function getMAX_SANE_PRICE_MULTIPLIER() external pure returns (uint256) {
+        return MAX_SANE_PRICE_MULTIPLIER;
     }
 }
