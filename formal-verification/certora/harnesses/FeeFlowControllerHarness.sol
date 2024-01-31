@@ -28,10 +28,6 @@ contract FeeFlowControllerHarness is FeeFlowController {
         return address(evc);
     }
 
-    // function getMsgSender() external view returns (address) {
-    //     return _msgSender();
-    // }
-
     function getTokenBalanceOf(address _token, address _account) external view returns (uint256) {
         ERC20 token = ERC20(_token);
         return token.balanceOf(_account);
@@ -90,6 +86,10 @@ contract FeeFlowControllerHarness is FeeFlowController {
 
     function getABS_MIN_INIT_PRICE() external pure returns (uint256) {
         return ABS_MIN_INIT_PRICE;
+    }
+
+    function getABS_MAX_INIT_PRICE() external pure returns (uint256) {
+        return ABS_MAX_INIT_PRICE;
     }
     // uint256 constant public PRICE_MULTIPLIER_SCALE = 1e18;
 

@@ -22,6 +22,7 @@ methods {
     function getMIN_EPOCH_PERIOD() external returns (uint256) envfree => CONSTANT; 
     function getMIN_PRICE_MULTIPLIER() external returns (uint256) envfree => CONSTANT; 
     function getABS_MIN_INIT_PRICE() external returns (uint256) envfree => CONSTANT; 
+    function getABS_MAX_INIT_PRICE() external returns (uint256) envfree => CONSTANT;
     function getPRICE_MULTIPLIER_SCALE() external returns (uint256) envfree => CONSTANT; 
     function getMAX_SANE_PRICE_MULTIPLIER() external returns (uint256) envfree => CONSTANT;
 }

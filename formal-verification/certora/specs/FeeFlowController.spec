@@ -7,39 +7,43 @@ using FeeFlowControllerHarness as feeFlowController;
 function constructorAssumptions(env e) {
 	uint initPriceStart = getInitPrice();
 	uint minInitPriceStart = getMinInitPrice();
-	// if(initPrice < minInitPrice_) revert InitPriceBelowMin();
+
+	//! if(initPrice < minInitPrice_) revert InitPriceBelowMin();
 	require initPriceStart >= minInitPriceStart;
 
 	uint epochPeriodStart = getEpochPeriod();
 	uint MIN_EPOCH_PERIOD = getMIN_EPOCH_PERIOD();
-	// if(epochPeriod_ < MIN_EPOCH_PERIOD) revert EpochPeriodBelowMin();
+	
+	//! if(epochPeriod_ < MIN_EPOCH_PERIOD) revert EpochPeriodBelowMin();
 	require epochPeriodStart >= MIN_EPOCH_PERIOD;
 	
-	// if(epochPeriod_ > MAX_EPOCH_PERIOD) revert EpochPeriodExceedsMax();
+	//! if(epochPeriod_ > MAX_EPOCH_PERIOD) revert EpochPeriodExceedsMax();
 	uint MAX_EPOCH_PERIOD = getMAX_EPOCH_PERIOD();
 	require epochPeriodStart <= MAX_EPOCH_PERIOD;
 
 	uint priceMultiplierStart = getPriceMultiplier();
 	uint MIN_PRICE_MULTIPLIER = getMIN_PRICE_MULTIPLIER();
 	uint MAX_SANE_PRICE_MULTIPLIER = getMAX_SANE_PRICE_MULTIPLIER();
-	// if(priceMultiplier_ < MIN_PRICE_MULTIPLIER) revert PriceMultiplierBelowMin();
+	
+	//! if(priceMultiplier_ < MIN_PRICE_MULTIPLIER) revert PriceMultiplierBelowMin();
 	require priceMultiplierStart >= MIN_PRICE_MULTIPLIER;
-	require priceMultiplierStart < MAX_SANE_PRICE_MULTIPLIER;
+
+	//! if(priceMultiplier_ > MAX_SANE_PRICE_MULTIPLIER) revert PriceMultiplierAboveMax();
+	require priceMultiplierStart <= MAX_SANE_PRICE_MULTIPLIER;
 	
 	uint ABS_MIN_INIT_PRICE = getABS_MIN_INIT_PRICE();
-	// if(minInitPrice_ < ABS_MIN_INIT_PRICE) revert MinInitPriceBelowMin();
+	//! if(minInitPrice_ < ABS_MIN_INIT_PRICE) revert MinInitPriceBelowMin();
 	require minInitPriceStart >= ABS_MIN_INIT_PRICE;
 
-	// if(minInitPrice_ > type(uint256).max) revert MinInitPriceExceedsuint256();
-	require minInitPriceStart < max_uint128;
+	//! if(minInitPrice_ > ABS_MAX_INIT_PRICE) revert MinInitPriceExceedsuint128();
+	require minInitPriceStart <= max_uint128;
 
-	// if(initPrice > ABS_MAX_INIT_PRICE) revert InitPriceAboveMax();
-	require initPriceStart < max_uint128;
+	//! if(initPrice > ABS_MAX_INIT_PRICE) revert InitPriceAboveMax();
+	require initPriceStart <= max_uint128;
 
-	// if(paymentReceiver_ == address(this)) revert PaymentReceiverIsThis();
+	//! if(paymentReceiver_ == address(this)) revert PaymentReceiverIsThis();
 	address paymentReceiver = getPaymentReceiver();
 	require(paymentReceiver != feeFlowController);
-	// require e.block.timestamp >= startTime;
 }
 
 function initialStateAssertions(env e) {
@@ -105,9 +109,9 @@ hook CALL(uint g, address addr, uint value, uint argsOffset, uint argsLength,
 
 // Invariants
 // NOTE: we are executing optimistic dispatches for the ERC20 tokens
-// ideally we would make sure that this holds with the pesimistic dispatches
-invariant no_reentrant_calls() !reentrancy_happened;
-invariant init_price_above_min() getInitPrice() >= getMinInitPrice();
+invariant invariant_no_reentrant_calls() !reentrancy_happened;
+invariant invariant_init_price_must_be_in_range() getInitPrice() >= getMinInitPrice() && getInitPrice() <= getABS_MAX_INIT_PRICE();
+invariant invariant_price_must_be_below_max_init_price(env e) getPrice(e) <= getInitPrice();
 
 // Rules
 rule reachability(method f)
@@ -135,25 +139,28 @@ rule check_buyNeverRevertsUnexpectedly() {
 	assert !lastReverted, "buy never reverts with arithmetic exceptions or internal solidity reverts";
 }
 
-// rule check_buyNextInitPriceAtLeastBuyPriceTimesMultiplier() {
-// 	env e;
-// 	constructorAssumptions(e);
-// 	calldataarg args;
-// 	address[] assets; address assetsReceiver; uint256 deadline; uint256 maxPaymentTokenAmount;
-// 	requirementsForBuyExecution(e, assets, assetsReceiver, deadline, maxPaymentTokenAmount);
-// 	mathint paymentAmount = buy@withrevert(e, assets, assetsReceiver, deadline, maxPaymentTokenAmount);
+rule check_buyNextInitPriceAtLeastBuyPriceTimesMultiplier() {
+	env e;
+	constructorAssumptions(e);
+	calldataarg args;
+	address[] assets; address assetsReceiver; uint256 deadline; uint256 maxPaymentTokenAmount;
+	requirementsForBuyExecution(e, assets, assetsReceiver, deadline, maxPaymentTokenAmount);
+	mathint paymentAmount = buy@withrevert(e, assets, assetsReceiver, deadline, maxPaymentTokenAmount);
 
-// 	mathint priceMultiplier = getPriceMultiplier();
-// 	mathint PRICE_MULTIPLIER_SCALE = getPRICE_MULTIPLIER_SCALE();
-// 	mathint predictedInitPrice = paymentAmount * priceMultiplier / PRICE_MULTIPLIER_SCALE;
+	mathint priceMultiplier = getPriceMultiplier();
+	mathint PRICE_MULTIPLIER_SCALE = getPRICE_MULTIPLIER_SCALE();
+	mathint predictedInitPrice = paymentAmount * priceMultiplier / PRICE_MULTIPLIER_SCALE;
 
-// 	mathint initPriceAfter = getInitPrice();
-// 	mathint minInitPrice = getMinInitPrice();
-// 	if (predictedInitPrice < minInitPrice) {
-// 		assert initPriceAfter == minInitPrice, "initPrice == minInitPrice";
-// 	} else {
-// 		assert initPriceAfter == predictedInitPrice, "initPrice == paymentAmount * priceMultiplier / PRICE_MULTIPLIER_SCALE";
-// 	}
-// }
-
-// assert paymentAmount would always be less then max_uint256
+	mathint initPriceAfter = getInitPrice();
+	mathint minInitPrice = getMinInitPrice();
+	mathint absMaxInitPrice = getABS_MAX_INIT_PRICE();
+	if (predictedInitPrice < minInitPrice) {
+		assert initPriceAfter == minInitPrice, "initPrice == minInitPrice";
+	} else {
+		if(predictedInitPrice > absMaxInitPrice) { 
+			assert initPriceAfter == absMaxInitPrice, "initPrice == ABS_MAX_INIT_PRICE";
+		} else {
+			assert initPriceAfter == predictedInitPrice, "initPrice == paymentAmount * priceMultiplier / PRICE_MULTIPLIER_SCALE";
+		}
+	}
+}

@@ -1,10 +1,10 @@
 --- ../src/FeeFlowController.sol	2024-01-30 14:17:26
-+++ patched/FeeFlowController.sol	2024-01-30 17:04:51
++++ patched/FeeFlowController.sol	2024-01-31 15:11:38
 @@ -17,6 +17,8 @@
      uint256 constant public MIN_EPOCH_PERIOD = 1 hours;
      uint256 constant public MAX_EPOCH_PERIOD = 365 days;
      uint256 constant public MIN_PRICE_MULTIPLIER = 1.1e18; // Should at least be 110% of settlement price
-+    uint256 constant public MAX_SANE_PRICE_MULTIPLIER = 10000 * 1e18; // Maximum sane value for price multiplier = 10_000x
++    uint256 constant public MAX_SANE_PRICE_MULTIPLIER = type(uint128).max; // Maximum sane value for price multiplier
 +    uint256 constant public ABS_MAX_INIT_PRICE = type(uint128).max; // Maximum sane value for init price
      uint256 constant public ABS_MIN_INIT_PRICE = 1e6; // Minimum sane value for init price
      uint256 constant public PRICE_MULTIPLIER_SCALE = 1e18;
