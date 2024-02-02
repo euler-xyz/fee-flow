@@ -17,6 +17,7 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
     uint256 constant public MIN_EPOCH_PERIOD = 1 hours;
     uint256 constant public MAX_EPOCH_PERIOD = 365 days;
     uint256 constant public MIN_PRICE_MULTIPLIER = 1.1e18; // Should at least be 110% of settlement price
+    uint256 constant public MAX_PRICE_MULTIPLIER = 3e18; // Should not exceed 300% of settlement price
     uint256 constant public ABS_MIN_INIT_PRICE = 1e6; // Minimum sane value for init price
     uint256 constant public ABS_MAX_INIT_PRICE = type(uint128).max;
     uint256 constant public PRICE_MULTIPLIER_SCALE = 1e18;
@@ -40,6 +41,7 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
     error EpochPeriodBelowMin();
     error EpochPeriodExceedsMax();
     error PriceMultiplierBelowMin();
+    error PriceMultiplierExceedsMax();
     error MinInitPriceBelowMin();
     error MinInitPriceExceedsUint128();
     error DeadlinePassed();
@@ -62,6 +64,7 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
         if(epochPeriod_ < MIN_EPOCH_PERIOD) revert EpochPeriodBelowMin();
         if(epochPeriod_ > MAX_EPOCH_PERIOD) revert EpochPeriodExceedsMax();
         if(priceMultiplier_ < MIN_PRICE_MULTIPLIER) revert PriceMultiplierBelowMin();
+        if(priceMultiplier_ > MAX_PRICE_MULTIPLIER) revert PriceMultiplierExceedsMax();
         if(minInitPrice_ < ABS_MIN_INIT_PRICE) revert MinInitPriceBelowMin();
         if(minInitPrice_ > ABS_MAX_INIT_PRICE) revert MinInitPriceExceedsUint128();
         if(paymentReceiver_ == address(this)) revert PaymentReceiverIsThis();
