@@ -101,7 +101,8 @@ contract FeeFlowControllerTest is Test {
     }
 
     function testConstructorMinInitPriceExceedsUint128() public {
-        vm.expectRevert(FeeFlowController.MinInitPriceExceedsUint128.selector);
+        // Fails at init price check
+        vm.expectRevert(FeeFlowController.InitPriceExceedsMax.selector);
         new FeeFlowController(address(evc), uint256(type(uint128).max) + 2, address(paymentToken), paymentReceiver, EPOCH_PERIOD, PRICE_MULTIPLIER, uint256(type(uint128).max) + 1);
     }
 
@@ -257,6 +258,27 @@ contract FeeFlowControllerTest is Test {
         vm.expectRevert("TRANSFER_FAILED");
         feeFlowController.buy(assets, assetsReceiver, block.timestamp + 1 days, 1000000e18);
         vm.stopPrank();
+    }
+
+    function testBuyInitPriceExceedingABS_MAX_INIT_PRICE() public {
+        uint256 absMaxInitPrice = feeFlowController.ABS_MAX_INIT_PRICE();
+
+        // Deploy with auction at max init price
+        FeeFlowController feeFlowController = new FeeFlowController(address(evc), absMaxInitPrice, address(paymentToken), paymentReceiver, EPOCH_PERIOD, PRICE_MULTIPLIER, absMaxInitPrice);
+
+        // Mint payment tokens to buyer
+        paymentToken.mint(buyer, type(uint128).max);
+
+        vm.startPrank(buyer);
+        // Approve payment token from buyer to FeeFlowController
+        paymentToken.approve(address(feeFlowController), type(uint256).max);
+        // Buy
+        feeFlowController.buy(assetsAddresses(), assetsReceiver, block.timestamp + 1 days, type(uint128).max);
+        vm.stopPrank();
+
+        // Assert new init price
+        FeeFlowController.Slot1 memory slot1 = feeFlowController.getSlot1();
+        assertEq(slot1.initPrice, uint128(absMaxInitPrice));
     }
 
     // Helper functions -----------------------------------------------------

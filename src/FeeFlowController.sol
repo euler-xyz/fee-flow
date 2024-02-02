@@ -18,6 +18,7 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
     uint256 constant public MAX_EPOCH_PERIOD = 365 days;
     uint256 constant public MIN_PRICE_MULTIPLIER = 1.1e18; // Should at least be 110% of settlement price
     uint256 constant public ABS_MIN_INIT_PRICE = 1e6; // Minimum sane value for init price
+    uint256 constant public ABS_MAX_INIT_PRICE = type(uint128).max;
     uint256 constant public PRICE_MULTIPLIER_SCALE = 1e18;
 
     ERC20 immutable public paymentToken;
@@ -35,6 +36,7 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
     event Buy(address indexed buyer, address indexed assetsReceiver, uint256 paymentAmount);
 
     error InitPriceBelowMin();
+    error InitPriceExceedsMax();
     error EpochPeriodBelowMin();
     error EpochPeriodExceedsMax();
     error PriceMultiplierBelowMin();
@@ -56,11 +58,12 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
     /// @notice This constructor performs parameter validation and sets the initial values for the contract.
     constructor(address evc, uint256 initPrice, address paymentToken_, address paymentReceiver_, uint256 epochPeriod_, uint256 priceMultiplier_, uint256 minInitPrice_) MinimalEVCClient(evc) {
         if(initPrice < minInitPrice_) revert InitPriceBelowMin();
+        if(initPrice > ABS_MAX_INIT_PRICE) revert InitPriceExceedsMax();
         if(epochPeriod_ < MIN_EPOCH_PERIOD) revert EpochPeriodBelowMin();
         if(epochPeriod_ > MAX_EPOCH_PERIOD) revert EpochPeriodExceedsMax();
         if(priceMultiplier_ < MIN_PRICE_MULTIPLIER) revert PriceMultiplierBelowMin();
         if(minInitPrice_ < ABS_MIN_INIT_PRICE) revert MinInitPriceBelowMin();
-        if(minInitPrice_ > type(uint128).max) revert MinInitPriceExceedsUint128();
+        if(minInitPrice_ > ABS_MAX_INIT_PRICE) revert MinInitPriceExceedsUint128();
         if(paymentReceiver_ == address(this)) revert PaymentReceiverIsThis();
 
         slot1.initPrice = uint128(initPrice);
@@ -102,7 +105,10 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
 
         // Setup new auction
         uint256 newInitPrice = paymentAmount * priceMultiplier / PRICE_MULTIPLIER_SCALE;
-        if(newInitPrice < minInitPrice) {
+
+        if(newInitPrice > ABS_MAX_INIT_PRICE) {
+            newInitPrice = ABS_MAX_INIT_PRICE;
+        } else if(newInitPrice < minInitPrice) {
             newInitPrice = minInitPrice;
         }
 
