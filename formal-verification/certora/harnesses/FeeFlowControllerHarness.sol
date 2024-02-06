@@ -97,7 +97,7 @@ contract FeeFlowControllerHarness is FeeFlowController {
         return PRICE_MULTIPLIER_SCALE;
     }
 
-    function getMAX_SANE_PRICE_MULTIPLIER() external pure returns (uint256) {
-        return MAX_SANE_PRICE_MULTIPLIER;
+    function getMAX_PRICE_MULTIPLIER() external pure returns (uint256) {
+        return MAX_PRICE_MULTIPLIER;
     }
 }

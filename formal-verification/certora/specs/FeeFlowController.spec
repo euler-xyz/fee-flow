@@ -7,9 +7,16 @@ using FeeFlowControllerHarness as feeFlowController;
 function constructorAssumptions(env e) {
 	uint initPriceStart = getInitPrice();
 	uint minInitPriceStart = getMinInitPrice();
+	uint ABS_MIN_INIT_PRICE = getABS_MIN_INIT_PRICE();
+	uint ABS_MAX_INIT_PRICE = getABS_MAX_INIT_PRICE();
+	uint MIN_PRICE_MULTIPLIER = getMIN_PRICE_MULTIPLIER();
+	uint MAX_PRICE_MULTIPLIER = getMAX_PRICE_MULTIPLIER();
 
 	//! if(initPrice < minInitPrice_) revert InitPriceBelowMin();
 	require initPriceStart >= minInitPriceStart;
+	
+	//! if(initPrice > ABS_MAX_INIT_PRICE) revert InitPriceAboveMax();
+	require initPriceStart <= ABS_MAX_INIT_PRICE;
 
 	uint epochPeriodStart = getEpochPeriod();
 	uint MIN_EPOCH_PERIOD = getMIN_EPOCH_PERIOD();
@@ -22,24 +29,18 @@ function constructorAssumptions(env e) {
 	require epochPeriodStart <= MAX_EPOCH_PERIOD;
 
 	uint priceMultiplierStart = getPriceMultiplier();
-	uint MIN_PRICE_MULTIPLIER = getMIN_PRICE_MULTIPLIER();
-	uint MAX_SANE_PRICE_MULTIPLIER = getMAX_SANE_PRICE_MULTIPLIER();
 	
 	//! if(priceMultiplier_ < MIN_PRICE_MULTIPLIER) revert PriceMultiplierBelowMin();
 	require priceMultiplierStart >= MIN_PRICE_MULTIPLIER;
 
-	//! if(priceMultiplier_ > MAX_SANE_PRICE_MULTIPLIER) revert PriceMultiplierAboveMax();
-	require priceMultiplierStart <= MAX_SANE_PRICE_MULTIPLIER;
+	// ! if(priceMultiplier_ > MAX_PRICE_MULTIPLIER) revert PriceMultiplierAboveMax();
+	require priceMultiplierStart <= MAX_PRICE_MULTIPLIER;
 	
-	uint ABS_MIN_INIT_PRICE = getABS_MIN_INIT_PRICE();
 	//! if(minInitPrice_ < ABS_MIN_INIT_PRICE) revert MinInitPriceBelowMin();
 	require minInitPriceStart >= ABS_MIN_INIT_PRICE;
 
 	//! if(minInitPrice_ > ABS_MAX_INIT_PRICE) revert MinInitPriceExceedsuint128();
-	require minInitPriceStart <= max_uint128;
-
-	//! if(initPrice > ABS_MAX_INIT_PRICE) revert InitPriceAboveMax();
-	require initPriceStart <= max_uint128;
+	require minInitPriceStart <= ABS_MAX_INIT_PRICE;
 
 	//! if(paymentReceiver_ == address(this)) revert PaymentReceiverIsThis();
 	address paymentReceiver = getPaymentReceiver();
@@ -55,13 +56,14 @@ function initialStateAssertions(env e) {
 	uint MIN_EPOCH_PERIOD = getMIN_EPOCH_PERIOD();
 	uint MIN_PRICE_MULTIPLIER = getMIN_PRICE_MULTIPLIER();
 	uint ABS_MIN_INIT_PRICE = getABS_MIN_INIT_PRICE();
+	uint ABS_MAX_INIT_PRICE = getABS_MAX_INIT_PRICE();
 
 	assert initPrice >= minInitPrice, "initPrice >= minInitPrice";
-	assert initPrice <= max_uint128, "initPrice < max_uint96";
+	assert initPrice <= ABS_MAX_INIT_PRICE, "initPrice < ABS_MAX_INIT_PRICE";
 	assert epochPeriod >= MIN_EPOCH_PERIOD, "epochPeriod >= MIN_EPOCH_PERIOD";
 	assert priceMultiplier >= MIN_PRICE_MULTIPLIER, "priceMultiplier >= MIN_PRICE_MULTIPLIER";
-	assert minInitPrice >= ABS_MIN_INIT_PRICE, "minInitPrice >= MIN_MIN_INIT_PRICE";
-	assert minInitPrice <= max_uint128, "minInitPrice <= max_uint128";
+	assert minInitPrice >= ABS_MIN_INIT_PRICE, "minInitPrice >= ABS_MIN_INIT_PRICE";
+	assert minInitPrice <= ABS_MAX_INIT_PRICE, "minInitPrice <= ABS_MAX_INIT_PRICE";
 	assert e.block.timestamp >= startTime, "e.block.timestamp >= startTime";
 }
 
