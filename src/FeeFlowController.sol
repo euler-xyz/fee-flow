@@ -98,7 +98,10 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
         paymentAmount = getPriceFromCache(slot1Cache);
 
         if(paymentAmount > maxPaymentTokenAmount) revert MaxPaymentTokenAmountExceeded();
-        paymentToken.safeTransferFrom(sender, paymentReceiver, paymentAmount);
+        
+        if(paymentAmount > 0) {
+            paymentToken.safeTransferFrom(sender, paymentReceiver, paymentAmount);
+        }
 
         for(uint256 i = 0; i < assets.length; i++) {
             // Transfer full balance to buyer
