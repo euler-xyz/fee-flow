@@ -100,9 +100,10 @@ contract FeeFlowControllerTest is Test {
         new FeeFlowController(address(evc), INIT_PRICE, address(paymentToken), paymentReceiver, EPOCH_PERIOD, PRICE_MULTIPLIER, absMinInitPrice - 1);
     }
 
-    function testConstructorMinInitPriceExceedsUint128() public {
-        vm.expectRevert(FeeFlowController.MinInitPriceExceedsUint128.selector);
-        new FeeFlowController(address(evc), uint256(type(uint128).max) + 2, address(paymentToken), paymentReceiver, EPOCH_PERIOD, PRICE_MULTIPLIER, uint256(type(uint128).max) + 1);
+    function testConstructorMinInitPriceExceedsABSMaxInitPrice() public {
+        // Fails at init price check
+        vm.expectRevert(FeeFlowController.InitPriceExceedsMax.selector);
+        new FeeFlowController(address(evc), uint256(type(uint216).max) + 2, address(paymentToken), paymentReceiver, EPOCH_PERIOD, PRICE_MULTIPLIER, uint256(type(uint216).max) + 1);
     }
 
     function testConstructorPaymentReceiverIsThis() public {
@@ -257,6 +258,27 @@ contract FeeFlowControllerTest is Test {
         vm.expectRevert("TRANSFER_FAILED");
         feeFlowController.buy(assets, assetsReceiver, block.timestamp + 1 days, 1000000e18);
         vm.stopPrank();
+    }
+
+    function testBuyInitPriceExceedingABS_MAX_INIT_PRICE() public {
+        uint256 absMaxInitPrice = feeFlowController.ABS_MAX_INIT_PRICE();
+
+        // Deploy with auction at max init price
+        FeeFlowController tempFeeFlowController = new FeeFlowController(address(evc), absMaxInitPrice, address(paymentToken), paymentReceiver, EPOCH_PERIOD, 1.1e18, absMaxInitPrice);
+
+        // Mint payment tokens to buyer
+        paymentToken.mint(buyer, type(uint216).max);
+
+        vm.startPrank(buyer);
+        // Approve payment token from buyer to FeeFlowController
+        paymentToken.approve(address(tempFeeFlowController), type(uint256).max);
+        // Buy
+        tempFeeFlowController.buy(assetsAddresses(), assetsReceiver, block.timestamp + 1 days, type(uint216).max);
+        vm.stopPrank();
+
+        // Assert new init price
+        FeeFlowController.Slot1 memory slot1 = tempFeeFlowController.getSlot1();
+        assertEq(slot1.initPrice, uint216(absMaxInitPrice));
     }
 
     // Helper functions -----------------------------------------------------
