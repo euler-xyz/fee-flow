@@ -1,0 +1,13 @@
+patched
+metadata.json
+*.instrumented
+*.original
+.certora*
+.certora*.json
+**.last_conf*
+certora-logs
+resource_errors.json
+certora_debug_log.txt
+.zip-output-url.txt
+smt
+node_modules
