@@ -19,7 +19,7 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
     uint256 constant public MIN_PRICE_MULTIPLIER = 1.1e18; // Should at least be 110% of settlement price
     uint256 constant public MAX_PRICE_MULTIPLIER = 3e18; // Should not exceed 300% of settlement price
     uint256 constant public ABS_MIN_INIT_PRICE = 1e6; // Minimum sane value for init price
-    uint256 constant public ABS_MAX_INIT_PRICE = type(uint128).max;
+    uint256 constant public ABS_MAX_INIT_PRICE = type(uint192).max; // chosen so that initPrice * priceMultiplier does not exceed uint256
     uint256 constant public PRICE_MULTIPLIER_SCALE = 1e18;
 
     ERC20 immutable public paymentToken;
@@ -29,8 +29,8 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
     uint256 immutable public minInitPrice;
 
     struct Slot1 {
-        uint128 initPrice;
-        uint64 startTime;
+        uint216 initPrice;
+        uint40 startTime;
     }
     Slot1 internal slot1;
 
@@ -43,7 +43,7 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
     error PriceMultiplierBelowMin();
     error PriceMultiplierExceedsMax();
     error MinInitPriceBelowMin();
-    error MinInitPriceExceedsUint128();
+    error MinInitPriceExceedsUint216();
     error DeadlinePassed();
     error EmptyAssets();
     error MaxPaymentTokenAmountExceeded();
@@ -66,11 +66,11 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
         if(priceMultiplier_ < MIN_PRICE_MULTIPLIER) revert PriceMultiplierBelowMin();
         if(priceMultiplier_ > MAX_PRICE_MULTIPLIER) revert PriceMultiplierExceedsMax();
         if(minInitPrice_ < ABS_MIN_INIT_PRICE) revert MinInitPriceBelowMin();
-        if(minInitPrice_ > ABS_MAX_INIT_PRICE) revert MinInitPriceExceedsUint128();
+        if(minInitPrice_ > ABS_MAX_INIT_PRICE) revert MinInitPriceExceedsUint216();
         if(paymentReceiver_ == address(this)) revert PaymentReceiverIsThis();
 
-        slot1.initPrice = uint128(initPrice);
-        slot1.startTime = uint64(block.timestamp);
+        slot1.initPrice = uint216(initPrice);
+        slot1.startTime = uint40(block.timestamp);
 
         paymentToken = ERC20(paymentToken_);
         paymentReceiver = paymentReceiver_;
@@ -118,8 +118,8 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
             newInitPrice = minInitPrice;
         }
 
-        slot1Cache.initPrice = uint128(newInitPrice);
-        slot1Cache.startTime = uint64(block.timestamp);
+        slot1Cache.initPrice = uint216(newInitPrice);
+        slot1Cache.startTime = uint40(block.timestamp);
 
         // Write cache in single write
         slot1 = slot1Cache;
