@@ -6,6 +6,7 @@ import "evc/EthereumVaultConnector.sol";
 import "./lib/MockToken.sol";
 import "./lib/ReenteringMockToken.sol";
 import "./lib/PredictAddress.sol";
+import "./lib/OverflowableEpochIdFeeFlowController.sol";
 import "../src/FeeFlowController.sol";
 
 contract FeeFlowControllerTest is Test {
@@ -339,14 +340,16 @@ contract FeeFlowControllerTest is Test {
         // MINT a lot of tokens
         paymentToken.mint(buyer, type(uint256).max - paymentToken.balanceOf(buyer));
 
+        OverflowableEpochIdFeeFlowController tempFeeFlowController = new OverflowableEpochIdFeeFlowController(address(evc),  MIN_INIT_PRICE, address(paymentToken), paymentReceiver, EPOCH_PERIOD, PRICE_MULTIPLIER, MIN_INIT_PRICE);
+        tempFeeFlowController.setEpochId(type(uint16).max);        
+
         vm.startPrank(buyer);
-        for(uint256 i = 0; i < 256; i ++) {
-            feeFlowController.buy(assetsAddresses(), assetsReceiver, uint8(i), block.timestamp + 1 days, type(uint256).max);
-        }
+        paymentToken.approve(address(tempFeeFlowController), type(uint256).max);
+        tempFeeFlowController.buy(assetsAddresses(), assetsReceiver, type(uint16).max, block.timestamp + 1 days, type(uint256).max);
         vm.stopPrank();
 
         FeeFlowController.Slot0 memory slot0 = feeFlowController.getSlot0();
-        assertEq(slot0.epochId, uint8(0));
+        assertEq(slot0.epochId, uint16(0));
     }
 
 

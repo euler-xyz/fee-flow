@@ -29,8 +29,8 @@ contract FeeFlowController is MinimalEVCClient {
 
     struct Slot0 {
         uint8 locked; // 1 if locked, 2 if unlocked
-        uint8 epochId; // intentionally overflows
-        uint200 initPrice;
+        uint16 epochId; // intentionally overflowable
+        uint192 initPrice;
         uint40 startTime;
     }
     Slot0 internal slot0;
@@ -65,6 +65,7 @@ contract FeeFlowController is MinimalEVCClient {
     }
     
     /// @dev Initializes the FeeFlowController contract with the specified parameters.
+    /// @param evc The address of the Ethereum Vault Connector (EVC) contract.
     /// @param initPrice The initial price for the first epoch.
     /// @param paymentToken_ The address of the payment token.
     /// @param paymentReceiver_ The address of the payment receiver.
@@ -83,7 +84,7 @@ contract FeeFlowController is MinimalEVCClient {
         if(minInitPrice_ > ABS_MAX_INIT_PRICE) revert MinInitPriceExceedsAbsMaxInitPrice();
         if(paymentReceiver_ == address(this)) revert PaymentReceiverIsThis();
 
-        slot0.initPrice = uint200(initPrice);
+        slot0.initPrice = uint192(initPrice);
         slot0.startTime = uint40(block.timestamp);
 
         paymentToken = ERC20(paymentToken_);
@@ -109,7 +110,7 @@ contract FeeFlowController is MinimalEVCClient {
 
         Slot0 memory slot0Cache = slot0;
 
-        if(uint8(epochId) != slot0Cache.epochId) revert EpochIdMismatch();
+        if(uint16(epochId) != slot0Cache.epochId) revert EpochIdMismatch();
 
         address sender = _msgSender();
         
@@ -138,7 +139,7 @@ contract FeeFlowController is MinimalEVCClient {
 
         // epochID is allowed to overflow, effectively reusing them 
         unchecked { slot0Cache.epochId ++;}
-        slot0Cache.initPrice = uint200(newInitPrice);
+        slot0Cache.initPrice = uint192(newInitPrice);
         slot0Cache.startTime = uint40(block.timestamp);
 
         // Write cache in single write
