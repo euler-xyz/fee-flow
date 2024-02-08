@@ -349,6 +349,62 @@ contract FeeFlowControllerTest is Test {
         assertEq(slot0.epochId, uint8(0));
     }
 
+
+    // Testing for overflows in price calculations --------------------------------
+    function testMAX_INIT_PRICEandMAX_EPOCH_PERIODdoNotOverflowPricing() public {
+        uint256 absMaxInitPrice = feeFlowController.ABS_MAX_INIT_PRICE();
+        uint256 maxEpochPeriod = feeFlowController.MAX_EPOCH_PERIOD();
+
+        FeeFlowController tempFeeFlowController = new FeeFlowController(address(evc), absMaxInitPrice, address(paymentToken), paymentReceiver, maxEpochPeriod, 1.1e18, absMaxInitPrice);
+        paymentToken.mint(buyer, absMaxInitPrice);
+
+        skip(maxEpochPeriod);
+
+        vm.startPrank(buyer);
+        paymentToken.approve(address(tempFeeFlowController), type(uint256).max);
+
+        // Since timePassed == epochPeriod, timePassed will be multiplied to epochPeriod.
+        // Does this not overflow and return zero?
+        assert(tempFeeFlowController.getPrice() == 0);
+        vm.stopPrank();
+    }
+
+    function testMAX_INIT_PRICEandMAX_EPOCH_PERIODminusOneDoNotOverflowPricing() public {
+        uint256 absMaxInitPrice = feeFlowController.ABS_MAX_INIT_PRICE();
+        uint256 maxEpochPeriod = feeFlowController.MAX_EPOCH_PERIOD();
+
+        FeeFlowController tempFeeFlowController = new FeeFlowController(address(evc), absMaxInitPrice, address(paymentToken), paymentReceiver, maxEpochPeriod, 1.1e18, absMaxInitPrice);
+        paymentToken.mint(buyer, absMaxInitPrice);
+
+        skip(maxEpochPeriod - 1);
+
+        vm.startPrank(buyer);
+        paymentToken.approve(address(tempFeeFlowController), type(uint256).max);
+
+        // Since timePassed < epochPeriod, timePassed will be multiplied to epochPeriod.
+        // Does this not overflow?
+        tempFeeFlowController.getPrice();
+        vm.stopPrank();
+    }
+
+    function testMAX_INIT_PRICEandMAX_PRICE_MULTIPLIERdoNotOverflowNextAuction() public {
+        uint256 absMaxInitPrice = feeFlowController.ABS_MAX_INIT_PRICE();
+        uint256 maxPriceMultiplier = feeFlowController.MAX_PRICE_MULTIPLIER();
+
+        FeeFlowController tempFeeFlowController = new FeeFlowController(address(evc), absMaxInitPrice, address(paymentToken), paymentReceiver, EPOCH_PERIOD, maxPriceMultiplier, absMaxInitPrice);
+        paymentToken.mint(buyer, absMaxInitPrice);
+
+        vm.startPrank(buyer);
+        paymentToken.approve(address(tempFeeFlowController), type(uint256).max);
+
+        // Purchase will initialize the next auction and increase the price by its multiplier. Doesn't it revert?
+        assert(tempFeeFlowController.buy(assetsAddresses(), assetsReceiver, 0, block.timestamp + 1 days, type(uint216).max) == absMaxInitPrice);
+        // Its next price should be capped to the maximum init price
+        assert(tempFeeFlowController.getPrice() == absMaxInitPrice);
+        vm.stopPrank();
+    }
+
+
     // Helper functions -----------------------------------------------------
     function mintTokensToBatchBuyer() public {
         for(uint256 i = 0; i < tokens.length; i++) {
