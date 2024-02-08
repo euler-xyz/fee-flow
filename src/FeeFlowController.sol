@@ -3,7 +3,6 @@ pragma solidity ^0.8.20;
 
 import {ERC20} from "solmate/tokens/ERC20.sol";
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
-import {ReentrancyGuard} from "solmate/utils/ReentrancyGuard.sol";
 import {MinimalEVCClient} from "./MinimalEVCClient.sol";
 
 
@@ -11,7 +10,7 @@ import {MinimalEVCClient} from "./MinimalEVCClient.sol";
 /// @title FeeFlowController
 /// @author Euler Labs (https://eulerlabs.com)
 /// @notice Continous back to back dutch auctions selling any asset received by this contract
-contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
+contract FeeFlowController is MinimalEVCClient {
     using SafeTransferLib for ERC20;
 
     uint256 constant public MIN_EPOCH_PERIOD = 1 hours;
@@ -28,15 +27,17 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
     uint256 immutable public priceMultiplier;
     uint256 immutable public minInitPrice;
 
-    struct Slot1 {
+    struct Slot0 {
+        uint8 locked; // 1 if locked, 2 if unlocked
         uint8 epochId; // intentionally overflows
-        uint208 initPrice;
+        uint200 initPrice;
         uint40 startTime;
     }
-    Slot1 internal slot1;
+    Slot0 internal slot0;
 
     event Buy(address indexed buyer, address indexed assetsReceiver, uint256 paymentAmount);
 
+    error Reentrancy();
     error InitPriceBelowMin();
     error InitPriceExceedsMax();
     error EpochPeriodBelowMin();
@@ -51,6 +52,17 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
     error MaxPaymentTokenAmountExceeded();
     error PaymentReceiverIsThis();
 
+    modifier nonReentrant() {
+        if(slot0.locked == 2) revert Reentrancy();
+        slot0.locked = 2;
+        _;
+        slot0.locked = 1;
+    }
+
+    modifier nonReentrantView() {
+        if(slot0.locked == 2) revert Reentrancy();
+        _;
+    }
     
     /// @dev Initializes the FeeFlowController contract with the specified parameters.
     /// @param initPrice The initial price for the first epoch.
@@ -71,8 +83,8 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
         if(minInitPrice_ > ABS_MAX_INIT_PRICE) revert MinInitPriceExceedsUint216();
         if(paymentReceiver_ == address(this)) revert PaymentReceiverIsThis();
 
-        slot1.initPrice = uint208(initPrice);
-        slot1.startTime = uint40(block.timestamp);
+        slot0.initPrice = uint200(initPrice);
+        slot0.startTime = uint40(block.timestamp);
 
         paymentToken = ERC20(paymentToken_);
         paymentReceiver = paymentReceiver_;
@@ -95,13 +107,13 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
         if(block.timestamp > deadline) revert DeadlinePassed();
         if(assets.length == 0) revert EmptyAssets();
 
-        Slot1 memory slot1Cache = slot1;
+        Slot0 memory slot0Cache = slot0;
 
-        if(uint8(epochId) != slot1.epochId) revert EpochIdMismatch();
+        if(uint8(epochId) != slot0Cache.epochId) revert EpochIdMismatch();
 
         address sender = _msgSender();
         
-        paymentAmount = getPriceFromCache(slot1Cache);
+        paymentAmount = getPriceFromCache(slot0Cache);
 
         if(paymentAmount > maxPaymentTokenAmount) revert MaxPaymentTokenAmountExceeded();
         
@@ -125,12 +137,12 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
         }
 
         // epochID is allowed to overflow, effectively reusing them 
-        unchecked { slot1Cache.epochId ++;}
-        slot1Cache.initPrice = uint208(newInitPrice);
-        slot1Cache.startTime = uint40(block.timestamp);
+        unchecked { slot0Cache.epochId ++;}
+        slot0Cache.initPrice = uint200(newInitPrice);
+        slot0Cache.startTime = uint40(block.timestamp);
 
         // Write cache in single write
-        slot1 = slot1Cache;
+        slot0 = slot0Cache;
 
         emit Buy(sender, assetsReceiver, paymentAmount);
 
@@ -139,32 +151,32 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
 
     
     /// @dev Retrieves the current price from the cache based on the elapsed time since the start of the epoch.
-    /// @param slot1Cache The Slot1 struct containing the initial price and start time of the epoch.
+    /// @param slot0Cache The Slot0 struct containing the initial price and start time of the epoch.
     /// @return price The current price calculated based on the elapsed time and the initial price.
     /// @notice This function calculates the current price by subtracting a fraction of the initial price based on the elapsed time.
     // If the elapsed time exceeds the epoch period, the price will be 0.
-    function getPriceFromCache(Slot1 memory slot1Cache) internal view returns(uint256){
-        uint256 timePassed = block.timestamp - slot1Cache.startTime;
+    function getPriceFromCache(Slot0 memory slot0Cache) internal view returns(uint256){
+        uint256 timePassed = block.timestamp - slot0Cache.startTime;
 
         if(timePassed > epochPeriod) {
             return 0;
         }
 
-        return slot1Cache.initPrice - slot1Cache.initPrice * timePassed / epochPeriod;
+        return slot0Cache.initPrice - slot0Cache.initPrice * timePassed / epochPeriod;
     }
 
 
     /// @dev Calculates the current price
     /// @return price The current price calculated based on the elapsed time and the initial price.
     /// @notice Uses the internal function `getPriceFromCache` to calculate the current price.
-    function getPrice() public view returns(uint256){
-        return getPriceFromCache(slot1);
+    function getPrice() public view nonReentrantView() returns(uint256){
+        return getPriceFromCache(slot0);
     }
 
 
-    /// @dev Retrieves slot1 as a memory struct
-    /// @return slot1 The slot1 value as a Slot1 struct
-    function getSlot1() public view returns (Slot1 memory) {
-        return slot1;
+    /// @dev Retrieves Slot0 as a memory struct
+    /// @return Slot0 The Slot0 value as a Slot0 struct
+    function getSlot0() public view nonReentrantView() returns (Slot0 memory) {
+        return slot0;
     }
 }

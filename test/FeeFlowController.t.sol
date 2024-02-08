@@ -60,10 +60,10 @@ contract FeeFlowControllerTest is Test {
     }
 
     function testConstructor() public {
-        FeeFlowController.Slot1 memory slot1 = feeFlowController.getSlot1();
+        FeeFlowController.Slot0 memory slot0 = feeFlowController.getSlot0();
         assertEq(address(feeFlowController.evc()), address(evc));
-        assertEq(slot1.initPrice, uint128(INIT_PRICE));
-        assertEq(slot1.startTime, block.timestamp);
+        assertEq(slot0.initPrice, uint128(INIT_PRICE));
+        assertEq(slot0.startTime, block.timestamp);
         assertEq(address(feeFlowController.paymentToken()), address(paymentToken));
         assertEq(feeFlowController.paymentReceiver(), paymentReceiver);
         assertEq(feeFlowController.epochPeriod(), EPOCH_PERIOD);
@@ -130,7 +130,7 @@ contract FeeFlowControllerTest is Test {
 
         uint256 paymentReceiverBalanceAfter = paymentToken.balanceOf(paymentReceiver);
         uint256 buyerBalanceAfter = paymentToken.balanceOf(buyer);
-        FeeFlowController.Slot1 memory slot1 = feeFlowController.getSlot1();
+        FeeFlowController.Slot0 memory slot0 = feeFlowController.getSlot0();
 
         // Assert token balances
         assert0Balances(address(feeFlowController));
@@ -140,9 +140,9 @@ contract FeeFlowControllerTest is Test {
         assertEq(buyerBalanceAfter, buyerBalanceBefore - expectedPrice);
 
         // Assert new auctionState
-        assertEq(slot1.epochId, uint8(1));
-        assertEq(slot1.initPrice, uint128(INIT_PRICE * 2));
-        assertEq(slot1.startTime, block.timestamp);
+        assertEq(slot0.epochId, uint8(1));
+        assertEq(slot0.initPrice, uint128(INIT_PRICE * 2));
+        assertEq(slot0.startTime, block.timestamp);
     }
 
     function testBuyEndOfAuction() public {
@@ -161,7 +161,7 @@ contract FeeFlowControllerTest is Test {
 
         uint256 paymentReceiverBalanceAfter = paymentToken.balanceOf(paymentReceiver);
         uint256 buyerBalanceAfter = paymentToken.balanceOf(buyer);
-        FeeFlowController.Slot1 memory slot1 = feeFlowController.getSlot1();
+        FeeFlowController.Slot0 memory slot0 = feeFlowController.getSlot0();
 
         // Assert token balances
         assert0Balances(address(feeFlowController));
@@ -172,9 +172,9 @@ contract FeeFlowControllerTest is Test {
         assertEq(buyerBalanceAfter, buyerBalanceBefore);
 
         // Assert new auctionState
-        assertEq(slot1.epochId, uint8(1));
-        assertEq(slot1.initPrice, MIN_INIT_PRICE);
-        assertEq(slot1.startTime, block.timestamp);
+        assertEq(slot0.epochId, uint8(1));
+        assertEq(slot0.initPrice, MIN_INIT_PRICE);
+        assertEq(slot0.startTime, block.timestamp);
     }
 
     function testBuyMiddleOfAuction() public {
@@ -193,7 +193,7 @@ contract FeeFlowControllerTest is Test {
 
         uint256 paymentReceiverBalanceAfter = paymentToken.balanceOf(paymentReceiver);
         uint256 buyerBalanceAfter = paymentToken.balanceOf(buyer);
-        FeeFlowController.Slot1 memory slot1 = feeFlowController.getSlot1();
+        FeeFlowController.Slot0 memory slot0 = feeFlowController.getSlot0();
 
         // Assert token balances
         assert0Balances(address(feeFlowController));
@@ -203,9 +203,9 @@ contract FeeFlowControllerTest is Test {
         assertEq(buyerBalanceAfter, buyerBalanceBefore - expectedPrice);
 
         // Assert new auctionState
-        assertEq(slot1.epochId, uint8(1));
-        assertEq(slot1.initPrice, uint128(INIT_PRICE));
-        assertEq(slot1.startTime, block.timestamp);
+        assertEq(slot0.epochId, uint8(1));
+        assertEq(slot0.initPrice, uint128(INIT_PRICE));
+        assertEq(slot0.startTime, block.timestamp);
     }
 
     function testBuyDeadlinePassedShouldFail() public {
@@ -278,6 +278,42 @@ contract FeeFlowControllerTest is Test {
         vm.stopPrank();
     }
 
+    function testBuyReenterGetPrice() public {
+        uint256 mintAmount = 1e18;
+
+        // Setup reentering token
+        ReenteringMockToken reenterToken = new ReenteringMockToken("ReenteringToken", "RET");
+        reenterToken.mint(address(feeFlowController), mintAmount);
+        reenterToken.setReenterTargetAndData(address(feeFlowController), abi.encodeWithSelector(feeFlowController.getPrice.selector));
+
+        address[] memory assets = new address[](1);
+        assets[0] = address(reenterToken);
+
+        vm.startPrank(buyer);
+        // Token does not bubble up error so this is the expected error on reentry
+        vm.expectRevert("TRANSFER_FAILED");
+        feeFlowController.buy(assets, assetsReceiver, 0, block.timestamp + 1 days, 1000000e18);
+        vm.stopPrank();
+    }
+
+    function testBuyReenterGetSlot0() public {
+        uint256 mintAmount = 1e18;
+
+        // Setup reentering token
+        ReenteringMockToken reenterToken = new ReenteringMockToken("ReenteringToken", "RET");
+        reenterToken.mint(address(feeFlowController), mintAmount);
+        reenterToken.setReenterTargetAndData(address(feeFlowController), abi.encodeWithSelector(feeFlowController.getSlot0.selector));
+
+        address[] memory assets = new address[](1);
+        assets[0] = address(reenterToken);
+
+        vm.startPrank(buyer);
+        // Token does not bubble up error so this is the expected error on reentry
+        vm.expectRevert("TRANSFER_FAILED");
+        feeFlowController.buy(assets, assetsReceiver, 0, block.timestamp + 1 days, 1000000e18);
+        vm.stopPrank();
+    }
+
     function testBuyInitPriceExceedingABS_MAX_INIT_PRICE() public {
         uint256 absMaxInitPrice = feeFlowController.ABS_MAX_INIT_PRICE();
 
@@ -295,8 +331,8 @@ contract FeeFlowControllerTest is Test {
         vm.stopPrank();
 
         // Assert new init price
-        FeeFlowController.Slot1 memory slot1 = tempFeeFlowController.getSlot1();
-        assertEq(slot1.initPrice, uint216(absMaxInitPrice));
+        FeeFlowController.Slot0 memory slot0 = tempFeeFlowController.getSlot0();
+        assertEq(slot0.initPrice, uint216(absMaxInitPrice));
     }
 
     function testBuyWrapAroundEpochId() public {
@@ -309,8 +345,8 @@ contract FeeFlowControllerTest is Test {
         }
         vm.stopPrank();
 
-        FeeFlowController.Slot1 memory slot1 = feeFlowController.getSlot1();
-        assertEq(slot1.epochId, uint8(0));
+        FeeFlowController.Slot0 memory slot0 = feeFlowController.getSlot0();
+        assertEq(slot0.epochId, uint8(0));
     }
 
     // Helper functions -----------------------------------------------------
