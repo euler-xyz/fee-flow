@@ -29,7 +29,8 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
     uint256 immutable public minInitPrice;
 
     struct Slot1 {
-        uint216 initPrice;
+        uint8 epochId; // intentionally overflows
+        uint208 initPrice;
         uint40 startTime;
     }
     Slot1 internal slot1;
@@ -46,6 +47,7 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
     error MinInitPriceExceedsUint216();
     error DeadlinePassed();
     error EmptyAssets();
+    error EpochIdMismatch();
     error MaxPaymentTokenAmountExceeded();
     error PaymentReceiverIsThis();
 
@@ -69,7 +71,7 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
         if(minInitPrice_ > ABS_MAX_INIT_PRICE) revert MinInitPriceExceedsUint216();
         if(paymentReceiver_ == address(this)) revert PaymentReceiverIsThis();
 
-        slot1.initPrice = uint216(initPrice);
+        slot1.initPrice = uint208(initPrice);
         slot1.startTime = uint40(block.timestamp);
 
         paymentToken = ERC20(paymentToken_);
@@ -83,16 +85,20 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
     /// @dev Allows a user to buy assets by transferring payment tokens and receiving the assets.
     /// @param assets The addresses of the assets to be bought.
     /// @param assetsReceiver The address that will receive the bought assets.
+    /// @param epochId Id of the epoch to buy from, will revert if not the current epoch
     /// @param deadline The deadline timestamp for the purchase.
     /// @param maxPaymentTokenAmount The maximum amount of payment tokens the user is willing to spend.
     /// @return paymentAmount The amount of payment tokens transferred for the purchase.
     /// @notice This function performs various checks and transfers the payment tokens to the payment receiver.
     /// It also transfers the assets to the assets receiver and sets up a new auction with an updated initial price.
-    function buy(address[] calldata assets, address assetsReceiver, uint256 deadline, uint256 maxPaymentTokenAmount) external nonReentrant returns(uint256 paymentAmount) {
+    function buy(address[] calldata assets, address assetsReceiver, uint256 epochId, uint256 deadline, uint256 maxPaymentTokenAmount) external nonReentrant returns(uint256 paymentAmount) {
         if(block.timestamp > deadline) revert DeadlinePassed();
         if(assets.length == 0) revert EmptyAssets();
 
         Slot1 memory slot1Cache = slot1;
+
+        if(uint8(epochId) != slot1.epochId) revert EpochIdMismatch();
+
         address sender = _msgSender();
         
         paymentAmount = getPriceFromCache(slot1Cache);
@@ -118,7 +124,9 @@ contract FeeFlowController is ReentrancyGuard, MinimalEVCClient {
             newInitPrice = minInitPrice;
         }
 
-        slot1Cache.initPrice = uint216(newInitPrice);
+        // epochID is allowed to overflow, effectively reusing them 
+        unchecked { slot1Cache.epochId ++;}
+        slot1Cache.initPrice = uint208(newInitPrice);
         slot1Cache.startTime = uint40(block.timestamp);
 
         // Write cache in single write

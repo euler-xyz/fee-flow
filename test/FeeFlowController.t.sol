@@ -125,7 +125,7 @@ contract FeeFlowControllerTest is Test {
         uint256 expectedPrice = feeFlowController.getPrice();
 
         vm.startPrank(buyer);
-        feeFlowController.buy(assetsAddresses(), assetsReceiver, block.timestamp + 1 days, 1000000e18);
+        feeFlowController.buy(assetsAddresses(), assetsReceiver, 0, block.timestamp + 1 days, 1000000e18);
         vm.stopPrank();
 
         uint256 paymentReceiverBalanceAfter = paymentToken.balanceOf(paymentReceiver);
@@ -139,7 +139,8 @@ contract FeeFlowControllerTest is Test {
         assertEq(paymentReceiverBalanceAfter, paymentReceiverBalanceBefore + expectedPrice);
         assertEq(buyerBalanceAfter, buyerBalanceBefore - expectedPrice);
 
-        // Assert new auction state
+        // Assert new auctionState
+        assertEq(slot1.epochId, uint8(1));
         assertEq(slot1.initPrice, uint128(INIT_PRICE * 2));
         assertEq(slot1.startTime, block.timestamp);
     }
@@ -155,7 +156,7 @@ contract FeeFlowControllerTest is Test {
         uint256 expectedPrice = feeFlowController.getPrice();
 
         vm.startPrank(buyer);
-        feeFlowController.buy(assetsAddresses(), assetsReceiver, block.timestamp + 1 days, 1000000e18);
+        feeFlowController.buy(assetsAddresses(), assetsReceiver, 0, block.timestamp + 1 days, 1000000e18);
         vm.stopPrank();
 
         uint256 paymentReceiverBalanceAfter = paymentToken.balanceOf(paymentReceiver);
@@ -171,6 +172,7 @@ contract FeeFlowControllerTest is Test {
         assertEq(buyerBalanceAfter, buyerBalanceBefore);
 
         // Assert new auctionState
+        assertEq(slot1.epochId, uint8(1));
         assertEq(slot1.initPrice, MIN_INIT_PRICE);
         assertEq(slot1.startTime, block.timestamp);
     }
@@ -186,7 +188,7 @@ contract FeeFlowControllerTest is Test {
         uint256 expectedPrice = feeFlowController.getPrice();
 
         vm.startPrank(buyer);
-        feeFlowController.buy(assetsAddresses(), assetsReceiver, block.timestamp + 1 days, 1000000e18);
+        feeFlowController.buy(assetsAddresses(), assetsReceiver, 0, block.timestamp + 1 days, 1000000e18);
         vm.stopPrank();
 
         uint256 paymentReceiverBalanceAfter = paymentToken.balanceOf(paymentReceiver);
@@ -201,6 +203,7 @@ contract FeeFlowControllerTest is Test {
         assertEq(buyerBalanceAfter, buyerBalanceBefore - expectedPrice);
 
         // Assert new auctionState
+        assertEq(slot1.epochId, uint8(1));
         assertEq(slot1.initPrice, uint128(INIT_PRICE));
         assertEq(slot1.startTime, block.timestamp);
     }
@@ -211,7 +214,7 @@ contract FeeFlowControllerTest is Test {
 
         vm.startPrank(buyer);
         vm.expectRevert(FeeFlowController.DeadlinePassed.selector);
-        feeFlowController.buy(assetsAddresses(), assetsReceiver, block.timestamp - 1 days, 1000000e18);
+        feeFlowController.buy(assetsAddresses(), assetsReceiver, 0, block.timestamp - 1 days, 1000000e18);
         vm.stopPrank();
 
         // Double check tokens haven't moved
@@ -223,7 +226,22 @@ contract FeeFlowControllerTest is Test {
 
         vm.startPrank(buyer);
         vm.expectRevert(FeeFlowController.EmptyAssets.selector);
-        feeFlowController.buy(new address[](0), assetsReceiver, block.timestamp + 1 days, 1000000e18);
+        feeFlowController.buy(new address[](0), assetsReceiver, 0, block.timestamp + 1 days, 1000000e18);
+        vm.stopPrank();
+
+        // Double check tokens haven't moved
+        assertMintBalances(address(feeFlowController));
+    }
+
+    function testBuyWrongEpochShouldFail() public {
+        mintTokensToBatchBuyer();
+
+        // Is actually at 0
+        uint256 epochId = 1;
+
+        vm.startPrank(buyer);
+        vm.expectRevert(FeeFlowController.EpochIdMismatch.selector);
+        feeFlowController.buy(assetsAddresses(), assetsReceiver, epochId, block.timestamp + 1 days, 1000000e18);
         vm.stopPrank();
 
         // Double check tokens haven't moved
@@ -235,7 +253,7 @@ contract FeeFlowControllerTest is Test {
 
         vm.startPrank(buyer);
         vm.expectRevert(FeeFlowController.MaxPaymentTokenAmountExceeded.selector);
-        feeFlowController.buy(assetsAddresses(), assetsReceiver, block.timestamp + 1 days, INIT_PRICE / 2);
+        feeFlowController.buy(assetsAddresses(), assetsReceiver, 0, block.timestamp + 1 days, INIT_PRICE / 2);
         vm.stopPrank();
 
         // Double check tokens haven't moved
@@ -256,7 +274,7 @@ contract FeeFlowControllerTest is Test {
         vm.startPrank(buyer);
         // Token does not bubble up error so this is the expected error on reentry
         vm.expectRevert("TRANSFER_FAILED");
-        feeFlowController.buy(assets, assetsReceiver, block.timestamp + 1 days, 1000000e18);
+        feeFlowController.buy(assets, assetsReceiver, 0, block.timestamp + 1 days, 1000000e18);
         vm.stopPrank();
     }
 
@@ -273,12 +291,26 @@ contract FeeFlowControllerTest is Test {
         // Approve payment token from buyer to FeeFlowController
         paymentToken.approve(address(tempFeeFlowController), type(uint256).max);
         // Buy
-        tempFeeFlowController.buy(assetsAddresses(), assetsReceiver, block.timestamp + 1 days, type(uint216).max);
+        tempFeeFlowController.buy(assetsAddresses(), assetsReceiver, 0, block.timestamp + 1 days, type(uint216).max);
         vm.stopPrank();
 
         // Assert new init price
         FeeFlowController.Slot1 memory slot1 = tempFeeFlowController.getSlot1();
         assertEq(slot1.initPrice, uint216(absMaxInitPrice));
+    }
+
+    function testBuyWrapAroundEpochId() public {
+        // MINT a lot of tokens
+        paymentToken.mint(buyer, type(uint256).max - paymentToken.balanceOf(buyer));
+
+        vm.startPrank(buyer);
+        for(uint256 i = 0; i < 256; i ++) {
+            feeFlowController.buy(assetsAddresses(), assetsReceiver, uint8(i), block.timestamp + 1 days, type(uint256).max);
+        }
+        vm.stopPrank();
+
+        FeeFlowController.Slot1 memory slot1 = feeFlowController.getSlot1();
+        assertEq(slot1.epochId, uint8(0));
     }
 
     // Helper functions -----------------------------------------------------
