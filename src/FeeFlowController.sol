@@ -45,7 +45,7 @@ contract FeeFlowController is MinimalEVCClient {
     error PriceMultiplierBelowMin();
     error PriceMultiplierExceedsMax();
     error MinInitPriceBelowMin();
-    error MinInitPriceExceedsUint216();
+    error MinInitPriceExceedsAbsMaxInitPrice();
     error DeadlinePassed();
     error EmptyAssets();
     error EpochIdMismatch();
@@ -80,7 +80,7 @@ contract FeeFlowController is MinimalEVCClient {
         if(priceMultiplier_ < MIN_PRICE_MULTIPLIER) revert PriceMultiplierBelowMin();
         if(priceMultiplier_ > MAX_PRICE_MULTIPLIER) revert PriceMultiplierExceedsMax();
         if(minInitPrice_ < ABS_MIN_INIT_PRICE) revert MinInitPriceBelowMin();
-        if(minInitPrice_ > ABS_MAX_INIT_PRICE) revert MinInitPriceExceedsUint216();
+        if(minInitPrice_ > ABS_MAX_INIT_PRICE) revert MinInitPriceExceedsAbsMaxInitPrice();
         if(paymentReceiver_ == address(this)) revert PaymentReceiverIsThis();
 
         slot0.initPrice = uint200(initPrice);
