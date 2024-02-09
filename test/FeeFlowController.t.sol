@@ -6,6 +6,7 @@ import "evc/EthereumVaultConnector.sol";
 import "./lib/MockToken.sol";
 import "./lib/ReenteringMockToken.sol";
 import "./lib/PredictAddress.sol";
+import "./lib/OverflowableEpochIdFeeFlowController.sol";
 import "../src/FeeFlowController.sol";
 
 contract FeeFlowControllerTest is Test {
@@ -60,10 +61,10 @@ contract FeeFlowControllerTest is Test {
     }
 
     function testConstructor() public {
-        FeeFlowController.Slot1 memory slot1 = feeFlowController.getSlot1();
+        FeeFlowController.Slot0 memory slot0 = feeFlowController.getSlot0();
         assertEq(address(feeFlowController.evc()), address(evc));
-        assertEq(slot1.initPrice, uint128(INIT_PRICE));
-        assertEq(slot1.startTime, block.timestamp);
+        assertEq(slot0.initPrice, uint128(INIT_PRICE));
+        assertEq(slot0.startTime, block.timestamp);
         assertEq(address(feeFlowController.paymentToken()), address(paymentToken));
         assertEq(feeFlowController.paymentReceiver(), paymentReceiver);
         assertEq(feeFlowController.epochPeriod(), EPOCH_PERIOD);
@@ -125,12 +126,12 @@ contract FeeFlowControllerTest is Test {
         uint256 expectedPrice = feeFlowController.getPrice();
 
         vm.startPrank(buyer);
-        feeFlowController.buy(assetsAddresses(), assetsReceiver, block.timestamp + 1 days, 1000000e18);
+        feeFlowController.buy(assetsAddresses(), assetsReceiver, 0, block.timestamp + 1 days, 1000000e18);
         vm.stopPrank();
 
         uint256 paymentReceiverBalanceAfter = paymentToken.balanceOf(paymentReceiver);
         uint256 buyerBalanceAfter = paymentToken.balanceOf(buyer);
-        FeeFlowController.Slot1 memory slot1 = feeFlowController.getSlot1();
+        FeeFlowController.Slot0 memory slot0 = feeFlowController.getSlot0();
 
         // Assert token balances
         assert0Balances(address(feeFlowController));
@@ -139,9 +140,10 @@ contract FeeFlowControllerTest is Test {
         assertEq(paymentReceiverBalanceAfter, paymentReceiverBalanceBefore + expectedPrice);
         assertEq(buyerBalanceAfter, buyerBalanceBefore - expectedPrice);
 
-        // Assert new auction state
-        assertEq(slot1.initPrice, uint128(INIT_PRICE * 2));
-        assertEq(slot1.startTime, block.timestamp);
+        // Assert new auctionState
+        assertEq(slot0.epochId, uint8(1));
+        assertEq(slot0.initPrice, uint128(INIT_PRICE * 2));
+        assertEq(slot0.startTime, block.timestamp);
     }
 
     function testBuyEndOfAuction() public {
@@ -155,12 +157,12 @@ contract FeeFlowControllerTest is Test {
         uint256 expectedPrice = feeFlowController.getPrice();
 
         vm.startPrank(buyer);
-        feeFlowController.buy(assetsAddresses(), assetsReceiver, block.timestamp + 1 days, 1000000e18);
+        feeFlowController.buy(assetsAddresses(), assetsReceiver, 0, block.timestamp + 1 days, 1000000e18);
         vm.stopPrank();
 
         uint256 paymentReceiverBalanceAfter = paymentToken.balanceOf(paymentReceiver);
         uint256 buyerBalanceAfter = paymentToken.balanceOf(buyer);
-        FeeFlowController.Slot1 memory slot1 = feeFlowController.getSlot1();
+        FeeFlowController.Slot0 memory slot0 = feeFlowController.getSlot0();
 
         // Assert token balances
         assert0Balances(address(feeFlowController));
@@ -171,8 +173,9 @@ contract FeeFlowControllerTest is Test {
         assertEq(buyerBalanceAfter, buyerBalanceBefore);
 
         // Assert new auctionState
-        assertEq(slot1.initPrice, MIN_INIT_PRICE);
-        assertEq(slot1.startTime, block.timestamp);
+        assertEq(slot0.epochId, uint8(1));
+        assertEq(slot0.initPrice, MIN_INIT_PRICE);
+        assertEq(slot0.startTime, block.timestamp);
     }
 
     function testBuyMiddleOfAuction() public {
@@ -186,12 +189,12 @@ contract FeeFlowControllerTest is Test {
         uint256 expectedPrice = feeFlowController.getPrice();
 
         vm.startPrank(buyer);
-        feeFlowController.buy(assetsAddresses(), assetsReceiver, block.timestamp + 1 days, 1000000e18);
+        feeFlowController.buy(assetsAddresses(), assetsReceiver, 0, block.timestamp + 1 days, 1000000e18);
         vm.stopPrank();
 
         uint256 paymentReceiverBalanceAfter = paymentToken.balanceOf(paymentReceiver);
         uint256 buyerBalanceAfter = paymentToken.balanceOf(buyer);
-        FeeFlowController.Slot1 memory slot1 = feeFlowController.getSlot1();
+        FeeFlowController.Slot0 memory slot0 = feeFlowController.getSlot0();
 
         // Assert token balances
         assert0Balances(address(feeFlowController));
@@ -201,8 +204,9 @@ contract FeeFlowControllerTest is Test {
         assertEq(buyerBalanceAfter, buyerBalanceBefore - expectedPrice);
 
         // Assert new auctionState
-        assertEq(slot1.initPrice, uint128(INIT_PRICE));
-        assertEq(slot1.startTime, block.timestamp);
+        assertEq(slot0.epochId, uint8(1));
+        assertEq(slot0.initPrice, uint128(INIT_PRICE));
+        assertEq(slot0.startTime, block.timestamp);
     }
 
     function testBuyDeadlinePassedShouldFail() public {
@@ -211,7 +215,7 @@ contract FeeFlowControllerTest is Test {
 
         vm.startPrank(buyer);
         vm.expectRevert(FeeFlowController.DeadlinePassed.selector);
-        feeFlowController.buy(assetsAddresses(), assetsReceiver, block.timestamp - 1 days, 1000000e18);
+        feeFlowController.buy(assetsAddresses(), assetsReceiver, 0, block.timestamp - 1 days, 1000000e18);
         vm.stopPrank();
 
         // Double check tokens haven't moved
@@ -223,7 +227,22 @@ contract FeeFlowControllerTest is Test {
 
         vm.startPrank(buyer);
         vm.expectRevert(FeeFlowController.EmptyAssets.selector);
-        feeFlowController.buy(new address[](0), assetsReceiver, block.timestamp + 1 days, 1000000e18);
+        feeFlowController.buy(new address[](0), assetsReceiver, 0, block.timestamp + 1 days, 1000000e18);
+        vm.stopPrank();
+
+        // Double check tokens haven't moved
+        assertMintBalances(address(feeFlowController));
+    }
+
+    function testBuyWrongEpochShouldFail() public {
+        mintTokensToBatchBuyer();
+
+        // Is actually at 0
+        uint256 epochId = 1;
+
+        vm.startPrank(buyer);
+        vm.expectRevert(FeeFlowController.EpochIdMismatch.selector);
+        feeFlowController.buy(assetsAddresses(), assetsReceiver, epochId, block.timestamp + 1 days, 1000000e18);
         vm.stopPrank();
 
         // Double check tokens haven't moved
@@ -235,7 +254,7 @@ contract FeeFlowControllerTest is Test {
 
         vm.startPrank(buyer);
         vm.expectRevert(FeeFlowController.MaxPaymentTokenAmountExceeded.selector);
-        feeFlowController.buy(assetsAddresses(), assetsReceiver, block.timestamp + 1 days, INIT_PRICE / 2);
+        feeFlowController.buy(assetsAddresses(), assetsReceiver, 0, block.timestamp + 1 days, INIT_PRICE / 2);
         vm.stopPrank();
 
         // Double check tokens haven't moved
@@ -256,7 +275,43 @@ contract FeeFlowControllerTest is Test {
         vm.startPrank(buyer);
         // Token does not bubble up error so this is the expected error on reentry
         vm.expectRevert("TRANSFER_FAILED");
-        feeFlowController.buy(assets, assetsReceiver, block.timestamp + 1 days, 1000000e18);
+        feeFlowController.buy(assets, assetsReceiver, 0, block.timestamp + 1 days, 1000000e18);
+        vm.stopPrank();
+    }
+
+    function testBuyReenterGetPrice() public {
+        uint256 mintAmount = 1e18;
+
+        // Setup reentering token
+        ReenteringMockToken reenterToken = new ReenteringMockToken("ReenteringToken", "RET");
+        reenterToken.mint(address(feeFlowController), mintAmount);
+        reenterToken.setReenterTargetAndData(address(feeFlowController), abi.encodeWithSelector(feeFlowController.getPrice.selector));
+
+        address[] memory assets = new address[](1);
+        assets[0] = address(reenterToken);
+
+        vm.startPrank(buyer);
+        // Token does not bubble up error so this is the expected error on reentry
+        vm.expectRevert("TRANSFER_FAILED");
+        feeFlowController.buy(assets, assetsReceiver, 0, block.timestamp + 1 days, 1000000e18);
+        vm.stopPrank();
+    }
+
+    function testBuyReenterGetSlot0() public {
+        uint256 mintAmount = 1e18;
+
+        // Setup reentering token
+        ReenteringMockToken reenterToken = new ReenteringMockToken("ReenteringToken", "RET");
+        reenterToken.mint(address(feeFlowController), mintAmount);
+        reenterToken.setReenterTargetAndData(address(feeFlowController), abi.encodeWithSelector(feeFlowController.getSlot0.selector));
+
+        address[] memory assets = new address[](1);
+        assets[0] = address(reenterToken);
+
+        vm.startPrank(buyer);
+        // Token does not bubble up error so this is the expected error on reentry
+        vm.expectRevert("TRANSFER_FAILED");
+        feeFlowController.buy(assets, assetsReceiver, 0, block.timestamp + 1 days, 1000000e18);
         vm.stopPrank();
     }
 
@@ -273,13 +328,85 @@ contract FeeFlowControllerTest is Test {
         // Approve payment token from buyer to FeeFlowController
         paymentToken.approve(address(tempFeeFlowController), type(uint256).max);
         // Buy
-        tempFeeFlowController.buy(assetsAddresses(), assetsReceiver, block.timestamp + 1 days, type(uint216).max);
+        tempFeeFlowController.buy(assetsAddresses(), assetsReceiver, 0, block.timestamp + 1 days, type(uint216).max);
         vm.stopPrank();
 
         // Assert new init price
-        FeeFlowController.Slot1 memory slot1 = tempFeeFlowController.getSlot1();
-        assertEq(slot1.initPrice, uint216(absMaxInitPrice));
+        FeeFlowController.Slot0 memory slot0 = tempFeeFlowController.getSlot0();
+        assertEq(slot0.initPrice, uint216(absMaxInitPrice));
     }
+
+    function testBuyWrapAroundEpochId() public {
+        // MINT a lot of tokens
+        paymentToken.mint(buyer, type(uint256).max - paymentToken.balanceOf(buyer));
+
+        OverflowableEpochIdFeeFlowController tempFeeFlowController = new OverflowableEpochIdFeeFlowController(address(evc),  MIN_INIT_PRICE, address(paymentToken), paymentReceiver, EPOCH_PERIOD, PRICE_MULTIPLIER, MIN_INIT_PRICE);
+        tempFeeFlowController.setEpochId(type(uint16).max);        
+
+        vm.startPrank(buyer);
+        paymentToken.approve(address(tempFeeFlowController), type(uint256).max);
+        tempFeeFlowController.buy(assetsAddresses(), assetsReceiver, type(uint16).max, block.timestamp + 1 days, type(uint256).max);
+        vm.stopPrank();
+
+        FeeFlowController.Slot0 memory slot0 = feeFlowController.getSlot0();
+        assertEq(slot0.epochId, uint16(0));
+    }
+
+
+    // Testing for overflows in price calculations --------------------------------
+    function testMAX_INIT_PRICEandMAX_EPOCH_PERIODdoNotOverflowPricing() public {
+        uint256 absMaxInitPrice = feeFlowController.ABS_MAX_INIT_PRICE();
+        uint256 maxEpochPeriod = feeFlowController.MAX_EPOCH_PERIOD();
+
+        FeeFlowController tempFeeFlowController = new FeeFlowController(address(evc), absMaxInitPrice, address(paymentToken), paymentReceiver, maxEpochPeriod, 1.1e18, absMaxInitPrice);
+        paymentToken.mint(buyer, absMaxInitPrice);
+
+        skip(maxEpochPeriod);
+
+        vm.startPrank(buyer);
+        paymentToken.approve(address(tempFeeFlowController), type(uint256).max);
+
+        // Since timePassed == epochPeriod, timePassed will be multiplied to epochPeriod.
+        // Does this not overflow and return zero?
+        assert(tempFeeFlowController.getPrice() == 0);
+        vm.stopPrank();
+    }
+
+    function testMAX_INIT_PRICEandMAX_EPOCH_PERIODminusOneDoNotOverflowPricing() public {
+        uint256 absMaxInitPrice = feeFlowController.ABS_MAX_INIT_PRICE();
+        uint256 maxEpochPeriod = feeFlowController.MAX_EPOCH_PERIOD();
+
+        FeeFlowController tempFeeFlowController = new FeeFlowController(address(evc), absMaxInitPrice, address(paymentToken), paymentReceiver, maxEpochPeriod, 1.1e18, absMaxInitPrice);
+        paymentToken.mint(buyer, absMaxInitPrice);
+
+        skip(maxEpochPeriod - 1);
+
+        vm.startPrank(buyer);
+        paymentToken.approve(address(tempFeeFlowController), type(uint256).max);
+
+        // Since timePassed < epochPeriod, timePassed will be multiplied to epochPeriod.
+        // Does this not overflow?
+        tempFeeFlowController.getPrice();
+        vm.stopPrank();
+    }
+
+    function testMAX_INIT_PRICEandMAX_PRICE_MULTIPLIERdoNotOverflowNextAuction() public {
+        uint256 absMaxInitPrice = feeFlowController.ABS_MAX_INIT_PRICE();
+        uint256 maxPriceMultiplier = feeFlowController.MAX_PRICE_MULTIPLIER();
+
+        FeeFlowController tempFeeFlowController = new FeeFlowController(address(evc), absMaxInitPrice, address(paymentToken), paymentReceiver, EPOCH_PERIOD, maxPriceMultiplier, absMaxInitPrice);
+        paymentToken.mint(buyer, absMaxInitPrice);
+
+        vm.startPrank(buyer);
+        paymentToken.approve(address(tempFeeFlowController), type(uint256).max);
+
+        // Purchase will initialize the next auction and increase the price by its multiplier. Doesn't it revert?
+        assert(tempFeeFlowController.buy(assetsAddresses(), assetsReceiver, 0, block.timestamp + 1 days, type(uint216).max) == absMaxInitPrice);
+        // Its next price should be capped to the maximum init price
+        assert(tempFeeFlowController.getPrice() == absMaxInitPrice);
+        vm.stopPrank();
+    }
+
 
     // Helper functions -----------------------------------------------------
     function mintTokensToBatchBuyer() public {
