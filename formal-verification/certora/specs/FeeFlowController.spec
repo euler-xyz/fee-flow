@@ -123,12 +123,6 @@ invariant invariant_no_reentrant_calls() !reentrancy_happened || reentrancy_happ
 invariant invariant_init_price_must_be_in_range() getInitPrice() >= getMinInitPrice() && getInitPrice() <= getABS_MAX_INIT_PRICE();
 invariant invariant_price_must_be_below_max_init_price(env e) getPrice(e) <= getInitPrice();
 
-// Balance of fee flow controller of a bought asset is always 0 after buy
-// Balance of asset receiver is incremented by balance of fee flow controller after buy
-// Balance of buyer is reduced by payment amount, and never by more than max payment amount
-// Balance of payment receiver is increased by payment amount
-// Payment amount returned on buy is never higher than maximum payout
-// Epoch Id is always incremented by 1 after buy (and becomes 0 if it reaches max uint16)
 
 // Rules
 rule reachability(method f)
@@ -181,3 +175,62 @@ rule check_buyNextInitPriceAtLeastBuyPriceTimesMultiplier() {
 		}
 	}
 }
+
+// Balance of fee flow controller of a bought asset is always 0 after buy
+// ! violated if assetsReceiver == feeFlowController
+rule check_feeFlowControllerTokenBalanceOfAfterBuy() {
+	env e;
+	constructorAssumptions(e);
+	address[] assets; address assetsReceiver; uint256 epochId; uint256 deadline; uint256 maxPaymentTokenAmount;
+
+	require(assets.length == 1); // making 1 transfer for simplicity and since we have no loops in CVL
+	require(assetsReceiver != feeFlowController); // make sure the receiver is not feeFlowController
+
+	buy(e, assets, assetsReceiver, epochId, deadline, maxPaymentTokenAmount);
+	uint256 feeControllerTokenBalance = feeFlowController.getTokenBalanceOf(e, assets[0], feeFlowController);
+	assert feeControllerTokenBalance == 0, "feeFlowController.getTokenBalanceOf(assets[0], feeFlowController) == 0";
+}
+
+// Balance of asset receiver is incremented by balance of fee flow controller after buy
+// ! violated if paymentToken == asset or assetsReceiver == feeFlowController
+rule check_balanceOfAssetsReceiverIsIncrementedByFeeFlowControllerTokenBalanceOfAfterBuy() {
+	env e;
+	constructorAssumptions(e);
+	address[] assets; address assetsReceiver; uint256 epochId; uint256 deadline; uint256 maxPaymentTokenAmount;
+
+	require(assets.length == 1); // making 1 transfer for simplicity and since we have no loops in CVL
+	require(assetsReceiver != feeFlowController); // make sure the receiver is not feeFlowController
+	require(assets[0] != getPaymentToken()); // make sure the asset is not the payment token
+
+	uint256 assetReceiverTokenBalance = feeFlowController.getTokenBalanceOf(e, assets[0], assetsReceiver);
+	uint256 feeControllerTokenBalance = feeFlowController.getTokenBalanceOf(e, assets[0], feeFlowController);
+	uint256 assetReceiverTokenBalanceAfterPredicted = require_uint256(feeControllerTokenBalance + assetReceiverTokenBalance);
+
+	buy(e, assets, assetsReceiver, epochId, deadline, maxPaymentTokenAmount);
+
+	assert feeFlowController.getTokenBalanceOf(e, assets[0], assetsReceiver) == assetReceiverTokenBalanceAfterPredicted, "feeFlowController.getTokenBalanceOf(assets[0], assetsReceiver) == assetReceiverTokenBalanceAfter";
+}
+
+// Balance of buyer is reduced by payment amount, and never by more than max payment amount
+//! violated if paymentReceiver == msg.sender && paymentToken == asset
+rule check_balanceOfBuyerIsReducedByPaymentAmount() {
+	env e;
+	constructorAssumptions(e);
+	address[] assets; address assetsReceiver; uint256 epochId; uint256 deadline; uint256 maxPaymentTokenAmount;
+
+	require(assets.length == 1); // making 1 transfer for simplicity and since we have no loops in CVL
+	require(assetsReceiver != feeFlowController); // make sure the receiver is not feeFlowController
+	require(assets[0] != getPaymentToken()); // make sure the asset is not the payment toke
+	require(getPaymentReceiver() != e.msg.sender); // make sure the payment receiver is not the buyer
+
+	uint256 paymentAmount = getPrice(e);
+	uint256 balanceBefore = feeFlowController.getPaymentTokenBalanceOf(e, e.msg.sender);
+	buy(e, assets, assetsReceiver, epochId, deadline, maxPaymentTokenAmount);
+	uint256 balanceAfter = feeFlowController.getPaymentTokenBalanceOf(e, e.msg.sender);
+	assert to_mathint(balanceAfter) == (balanceBefore - paymentAmount), "balanceAfter == (balanceBefore - paymentAmount)";
+}
+
+// Balance of payment receiver is increased by payment amount
+
+// Payment amount returned on buy is never higher than maximum payout
+// Epoch Id is always incremented by 1 after buy (and becomes 0 if it reaches max uint16)

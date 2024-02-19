@@ -14,6 +14,7 @@ methods {
     function getStartTime() external returns (uint256) envfree; 
     function getEpochId() external returns (uint256) envfree;
     function getPaymentReceiver() external returns (address) envfree; 
+    function getPaymentToken() external returns (address) envfree;
     function getEpochPeriod() external returns (uint256) envfree; 
     function getPriceMultiplier() external returns (uint256) envfree; 
     // function getMsgSender() external returns (address) envfree;

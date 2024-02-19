@@ -57,8 +57,12 @@ contract FeeFlowControllerHarness is FeeFlowController {
     function getPaymentReceiver() external view returns (address) {
         return paymentReceiver;
     }
-    // uint256 immutable public epochPeriod;
+    
+    function getPaymentToken() external view returns (address) {
+        return address(paymentToken);
+    }
 
+    // uint256 immutable public epochPeriod;
     function getEpochPeriod() external view returns (uint256) {
         return epochPeriod;
     }
