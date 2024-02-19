@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.20;
+// SPDX-License-Identifier: GPL-2.0-or-later
+pragma solidity 0.8.20;
 
 import {ERC20} from "solmate/tokens/ERC20.sol";
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
@@ -170,14 +170,14 @@ contract FeeFlowController is MinimalEVCClient {
     /// @dev Calculates the current price
     /// @return price The current price calculated based on the elapsed time and the initial price.
     /// @notice Uses the internal function `getPriceFromCache` to calculate the current price.
-    function getPrice() public view nonReentrantView() returns(uint256){
+    function getPrice() external view nonReentrantView() returns(uint256){
         return getPriceFromCache(slot0);
     }
 
 
     /// @dev Retrieves Slot0 as a memory struct
     /// @return Slot0 The Slot0 value as a Slot0 struct
-    function getSlot0() public view nonReentrantView() returns (Slot0 memory) {
+    function getSlot0() external view nonReentrantView() returns (Slot0 memory) {
         return slot0;
     }
 }
