@@ -42,11 +42,15 @@ contract FeeFlowControllerHarness is FeeFlowController {
     }
 
     function getInitPrice() external view returns (uint256) {
-        return slot1.initPrice;
+        return slot0.initPrice;
     }
 
     function getStartTime() external view returns (uint256) {
-        return slot1.startTime;
+        return slot0.startTime;
+    }
+
+    function getEpochId() external view returns (uint256) {
+        return slot0.epochId;
     }
 
     // address immutable public paymentReceiver;

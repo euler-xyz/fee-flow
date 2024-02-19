@@ -67,9 +67,10 @@ function initialStateAssertions(env e) {
 	assert e.block.timestamp >= startTime, "e.block.timestamp >= startTime";
 }
 
-function requirementsForBuyExecution(env e, address[] assets, address assetsReceiver, uint256 deadline, uint256 maxPaymentTokenAmount) {
+function requirementsForSuccessfulBuyExecution(env e, address[] assets, address assetsReceiver,uint256 epochId, uint256 deadline, uint256 maxPaymentTokenAmount) {
 	reentrancyMock(); // this sets the lock to the correct initial value
 	uint256 initPriceStart = getInitPrice();
+	require(epochId == getEpochId());
 	require(maxPaymentTokenAmount > initPriceStart);
 	require(e.block.timestamp <= deadline);
 	uint256 paymentAmount = getPrice(e);
@@ -100,6 +101,10 @@ persistent ghost bool reentrancy_happened {
     init_state axiom !reentrancy_happened;
 }
 
+persistent ghost bool reverted {
+	init_state axiom !reverted;
+}
+
 hook CALL(uint g, address addr, uint value, uint argsOffset, uint argsLength, 
           uint retOffset, uint retLength) uint rc {
     if (addr == currentContract) {
@@ -108,12 +113,22 @@ hook CALL(uint g, address addr, uint value, uint argsOffset, uint argsLength,
     }
 }
 
+hook REVERT(uint offset, uint size) {
+	reverted = true;
+}
 
 // Invariants
 // NOTE: we are executing optimistic dispatches for the ERC20 tokens
-invariant invariant_no_reentrant_calls() !reentrancy_happened;
+invariant invariant_no_reentrant_calls() !reentrancy_happened || reentrancy_happened && reverted;
 invariant invariant_init_price_must_be_in_range() getInitPrice() >= getMinInitPrice() && getInitPrice() <= getABS_MAX_INIT_PRICE();
 invariant invariant_price_must_be_below_max_init_price(env e) getPrice(e) <= getInitPrice();
+
+// Balance of fee flow controller of a bought asset is always 0 after buy
+// Balance of asset receiver is incremented by balance of fee flow controller after buy
+// Balance of buyer is reduced by payment amount, and never by more than max payment amount
+// Balance of payment receiver is increased by payment amount
+// Payment amount returned on buy is never higher than maximum payout
+// Epoch Id is always incremented by 1 after buy (and becomes 0 if it reaches max uint16)
 
 // Rules
 rule reachability(method f)
@@ -124,7 +139,7 @@ rule reachability(method f)
 	satisfy true, "a non-reverting path through this method was found";
 }
 
-rule check_initailStateAssertionsAfterBuy() {
+rule check_constructorAssumptionsSatisfiedAfterBuy() {
 	env e;
 	constructorAssumptions(e);
 	calldataarg args;
@@ -135,9 +150,9 @@ rule check_initailStateAssertionsAfterBuy() {
 rule check_buyNeverRevertsUnexpectedly() {
 	env e;
 	constructorAssumptions(e);
-	address[] assets; address assetsReceiver; uint256 deadline; uint256 maxPaymentTokenAmount;
-	requirementsForBuyExecution(e, assets, assetsReceiver, deadline, maxPaymentTokenAmount);
-	buy@withrevert(e, assets, assetsReceiver, deadline, maxPaymentTokenAmount);
+	address[] assets; address assetsReceiver; uint256 epochId; uint256 deadline; uint256 maxPaymentTokenAmount;
+	requirementsForSuccessfulBuyExecution(e, assets, assetsReceiver, epochId, deadline, maxPaymentTokenAmount);
+	buy@withrevert(e, assets, assetsReceiver, epochId, deadline, maxPaymentTokenAmount);
 	assert !lastReverted, "buy never reverts with arithmetic exceptions or internal solidity reverts";
 }
 
@@ -145,9 +160,9 @@ rule check_buyNextInitPriceAtLeastBuyPriceTimesMultiplier() {
 	env e;
 	constructorAssumptions(e);
 	calldataarg args;
-	address[] assets; address assetsReceiver; uint256 deadline; uint256 maxPaymentTokenAmount;
-	requirementsForBuyExecution(e, assets, assetsReceiver, deadline, maxPaymentTokenAmount);
-	mathint paymentAmount = buy@withrevert(e, assets, assetsReceiver, deadline, maxPaymentTokenAmount);
+	address[] assets; address assetsReceiver; uint256 epochId; uint256 deadline; uint256 maxPaymentTokenAmount;
+	requirementsForSuccessfulBuyExecution(e, assets, assetsReceiver, epochId, deadline, maxPaymentTokenAmount);
+	mathint paymentAmount = buy@withrevert(e, assets, assetsReceiver, epochId, deadline, maxPaymentTokenAmount);
 
 	mathint priceMultiplier = getPriceMultiplier();
 	mathint PRICE_MULTIPLIER_SCALE = getPRICE_MULTIPLIER_SCALE();

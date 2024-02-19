@@ -1,5 +1,5 @@
 methods {
-	function buy(address[] assets, address assetsReceiver, uint256 deadline, uint256 maxPaymentTokenAmount) external returns(uint256) => HAVOC_ECF; // nonReentrant summary
+	function buy(address[] assets, address assetsReceiver, uint256 epochId, uint256 deadline, uint256 maxPaymentTokenAmount) external returns(uint256) => HAVOC_ECF; // nonReentrant summary
     function getPrice() external returns(uint256);
     function paymentReceiver() external returns(address) envfree => CONSTANT;
     function reentrancyMock() external envfree;
@@ -12,6 +12,7 @@ methods {
 	function getMinInitPrice() external returns (uint256) envfree;
 	function getInitPrice() external returns (uint256) envfree;
     function getStartTime() external returns (uint256) envfree; 
+    function getEpochId() external returns (uint256) envfree;
     function getPaymentReceiver() external returns (address) envfree; 
     function getEpochPeriod() external returns (uint256) envfree; 
     function getPriceMultiplier() external returns (uint256) envfree; 
