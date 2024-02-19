@@ -199,6 +199,8 @@ rule check_balanceOfAssetsReceiverIsIncrementedByFeeFlowControllerTokenBalanceOf
 	address[] assets; address assetsReceiver; uint256 epochId; uint256 deadline; uint256 maxPaymentTokenAmount;
 
 	require(assets.length == 1); // making 1 transfer for simplicity and since we have no loops in CVL
+
+	//! should be in contract in order for this to hold always
 	require(assetsReceiver != feeFlowController); // make sure the receiver is not feeFlowController
 	require(assets[0] != getPaymentToken()); // make sure the asset is not the payment token
 
@@ -219,6 +221,8 @@ rule check_balanceOfBuyerIsReducedByPaymentAmount() {
 	address[] assets; address assetsReceiver; uint256 epochId; uint256 deadline; uint256 maxPaymentTokenAmount;
 
 	require(assets.length == 1); // making 1 transfer for simplicity and since we have no loops in CVL
+
+	//! should be in contract in order for this to hold always
 	require(assetsReceiver != feeFlowController); // make sure the receiver is not feeFlowController
 	require(assets[0] != getPaymentToken()); // make sure the asset is not the payment toke
 	require(getPaymentReceiver() != e.msg.sender); // make sure the payment receiver is not the buyer
@@ -227,10 +231,31 @@ rule check_balanceOfBuyerIsReducedByPaymentAmount() {
 	uint256 balanceBefore = feeFlowController.getPaymentTokenBalanceOf(e, e.msg.sender);
 	buy(e, assets, assetsReceiver, epochId, deadline, maxPaymentTokenAmount);
 	uint256 balanceAfter = feeFlowController.getPaymentTokenBalanceOf(e, e.msg.sender);
-	assert to_mathint(balanceAfter) == (balanceBefore - paymentAmount), "balanceAfter == (balanceBefore - paymentAmount)";
+	assert to_mathint(balanceAfter) == (balanceBefore - paymentAmount), "msg.sender (PaymentToken) => balanceAfter == (balanceBefore - paymentAmount)";
 }
 
 // Balance of payment receiver is increased by payment amount
+//! violated if paymentReceiver == e.msg.sender
+rule check_balanceOfPaymentReceiverIsIncreasedByPaymentAmount() {
+	env e;
+	constructorAssumptions(e);
+	address[] assets; address assetsReceiver; uint256 epochId; uint256 deadline; uint256 maxPaymentTokenAmount;
+
+	require(assets.length == 1); // making 1 transfer for simplicity and since we have no loops in CVL
+
+	//! should be in contract in order for this to hold always
+	require(assetsReceiver != feeFlowController); // make sure the receiver is not feeFlowController
+	require(assets[0] != getPaymentToken()); // make sure the asset is not the payment token
+	require(getPaymentReceiver() != e.msg.sender); // make sure the payment receiver is not the buyer
+
+	uint256 paymentAmount = getPrice(e);
+	address paymentReceiver = getPaymentReceiver();
+
+	uint256 balanceBefore = feeFlowController.getPaymentTokenBalanceOf(e, paymentReceiver);
+	buy(e, assets, assetsReceiver, epochId, deadline, maxPaymentTokenAmount);
+	uint256 balanceAfter = feeFlowController.getPaymentTokenBalanceOf(e, paymentReceiver);
+	assert to_mathint(balanceAfter) == (balanceBefore + paymentAmount), "paymentReceiver (PaymentToken) => balanceAfter == (balanceBefore + paymentAmount)";
+}
 
 // Payment amount returned on buy is never higher than maximum payout
 // Epoch Id is always incremented by 1 after buy (and becomes 0 if it reaches max uint16)
