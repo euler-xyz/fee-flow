@@ -258,4 +258,33 @@ rule check_balanceOfPaymentReceiverIsIncreasedByPaymentAmount() {
 }
 
 // Payment amount returned on buy is never higher than maximum payout
+rule check_paymentAmountReturnedOnBuyIsNeverHigherThanMaximumPayout() {
+	env e;
+	constructorAssumptions(e);
+	address[] assets; address assetsReceiver; uint256 epochId; uint256 deadline; uint256 maxPaymentTokenAmount;
+
+	require(assets.length == 1); // making 1 transfer for simplicity and since we have no loops in CVL
+
+	//! should be in contract in order for this to hold always
+	require(assetsReceiver != feeFlowController); // make sure the receiver is not feeFlowController
+	require(assets[0] != getPaymentToken()); // make sure the asset is not the payment token
+	require(getPaymentReceiver() != e.msg.sender); // make sure the payment receiver is not the buyer
+
+	uint256 paymentAmount = getPrice(e);
+	uint256 balanceBefore = feeFlowController.getPaymentTokenBalanceOf(e, assetsReceiver);
+	buy(e, assets, assetsReceiver, epochId, deadline, maxPaymentTokenAmount);
+	uint256 balanceAfter = feeFlowController.getPaymentTokenBalanceOf(e, assetsReceiver);
+	assert paymentAmount <= maxPaymentTokenAmount, "paymentAmount <= maxPaymentTokenAmount";
+	assert to_mathint(balanceAfter) <= (balanceBefore + maxPaymentTokenAmount), "balanceAfter <= (balanceBefore + maxPaymentTokenAmount)";
+}
+
 // Epoch Id is always incremented by 1 after buy (and becomes 0 if it reaches max uint16)
+rule check_epochIdAlwaysIncrementedBy1AfterBuy() {
+	env e;
+	constructorAssumptions(e);
+	address[] assets; address assetsReceiver; uint256 epochId; uint256 deadline; uint256 maxPaymentTokenAmount;
+	uint256 epochIdBefore = getEpochId();
+	buy(e, assets, assetsReceiver, epochId, deadline, maxPaymentTokenAmount);
+	uint256 epochIdAfter = getEpochId();
+	assert (epochIdAfter == 0 && epochIdBefore == max_uint16) || epochIdAfter == assert_uint256(epochIdBefore + 1), "epochIdAfter == (epochIdBefore + 1) || (epochIdAfter == 0 && epochIdBefore == 65535)";
+}
