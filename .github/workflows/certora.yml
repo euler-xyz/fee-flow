@@ -46,24 +46,23 @@ jobs:
         # ln -s /usr/local/bin/solc8.0 /usr/local/bin/solc
 
       # Patching the files with the diff patches
-      - name: Patch the contracts
-        run: ./formal-verification/make-patch.sh
+      # - name: Patch the contracts
+      #   run: ./formal-verification/make-patch.sh
 
 
       # Do the actual verification. The `run` field could be simply
       #
       #   certoraRun certora/conf/${{ matrix.params }}
-      # 
+      #
       # but we do a little extra work to get the commit messages into the
       # `--msg` argument
       #
       # Here ${{ matrix.params }} gets replaced with each of the parameters
       # listed in the `params` section below.
+      # message="$(git log -n 1 --pretty=format:'CI ${{matrix.params.name}} %h .... %s')";
       - name: Verify rule ${{ matrix.params.name }}
-        run: >
-          message="$(git log -n 1 --pretty=format:'CI ${{matrix.params.name}} %h .... %s')";
-            ./formal-verification/run.sh ${{ matrix.params.command }} \
-            --msg "$(echo $message | sed 's/[^a-zA-Z0-9., _-]/ /g')"
+        run: ./formal-verification/run.sh ${{ matrix.params.command }} 
+
         env:
           # For this to work, you must set your CERTORAKEY secret on the GitHub
           # website (settings > secrets > actions > new repository secret)
