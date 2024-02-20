@@ -3,6 +3,7 @@
 name: Certora verification
 
 on:
+  push: {}
   pull_request: {}
   workflow_dispatch: {}
 
