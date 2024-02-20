@@ -62,8 +62,7 @@ jobs:
       - name: Verify rule ${{ matrix.params.name }}
         run: >
           message="$(git log -n 1 --pretty=format:'CI ${{matrix.params.name}} %h .... %s')";
-          certoraRun \
-            formal-verification/certora/conf/${{ matrix.params.command }} \
+            ./formal-verification/run.sh ${{ matrix.params.command }} \
             --msg "$(echo $message | sed 's/[^a-zA-Z0-9., _-]/ /g')"
         env:
           # For this to work, you must set your CERTORAKEY secret on the GitHub
@@ -100,10 +99,10 @@ jobs:
           # It is often helpful to split up by rule or even by method for a
           # parametric rule, although it is certainly possible to run everything
           # at once by not passing the `--rule` or `--method` options
-          #- {name: transferSpec,        command: 'ERC20.conf --rule transferSpec'}
-          #- {name: generalRulesOnERC20, command: 'generalRules_ERC20.conf --debug'}
-          #- {name: generalRulesOnVAULT, command: 'generalRules_VAULT.conf --debug'}
-          - {name: RulesForFeeFlowController, command: 'default.conf'}
+          #- {name: transferSpec,        command: 'ERC20'}
+          #- {name: generalRulesOnERC20, command: 'generalRules_ERC20'}
+          #- {name: generalRulesOnVAULT, command: 'generalRules_VAULT'}
+          - {name: RulesForFeeFlowController, command: 'default'}
 
   # mutate:
   #   runs-on: ubuntu-latest
