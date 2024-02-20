@@ -45,6 +45,16 @@ jobs:
         # chmod +x /usr/local/bin/solc8.0
         # ln -s /usr/local/bin/solc8.0 /usr/local/bin/solc
 
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+      
+      - name: Run Forge install
+        run: |
+          forge --version
+          forge install
+        id: install
 
       # Do the actual verification. The `run` field could be simply
       #
