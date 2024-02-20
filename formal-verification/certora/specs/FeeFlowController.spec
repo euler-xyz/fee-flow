@@ -177,7 +177,6 @@ rule check_buyNextInitPriceAtLeastBuyPriceTimesMultiplier() {
 }
 
 // Balance of fee flow controller of a bought asset is always 0 after buy
-// ! violated if assetsReceiver == feeFlowController
 rule check_feeFlowControllerTokenBalanceOfAfterBuy() {
 	env e;
 	constructorAssumptions(e);
@@ -192,7 +191,6 @@ rule check_feeFlowControllerTokenBalanceOfAfterBuy() {
 }
 
 // Balance of asset receiver is incremented by balance of fee flow controller after buy
-// ! violated if paymentToken == asset or assetsReceiver == feeFlowController
 rule check_balanceOfAssetsReceiverIsIncrementedByFeeFlowControllerTokenBalanceOfAfterBuy() {
 	env e;
 	constructorAssumptions(e);
@@ -200,7 +198,6 @@ rule check_balanceOfAssetsReceiverIsIncrementedByFeeFlowControllerTokenBalanceOf
 
 	require(assets.length == 1); // making 1 transfer for simplicity and since we have no loops in CVL
 
-	//! should be in contract in order for this to hold always
 	require(assetsReceiver != feeFlowController); // make sure the receiver is not feeFlowController
 	require(assets[0] != getPaymentToken()); // make sure the asset is not the payment token
 
@@ -214,7 +211,6 @@ rule check_balanceOfAssetsReceiverIsIncrementedByFeeFlowControllerTokenBalanceOf
 }
 
 // Balance of buyer is reduced by payment amount, and never by more than max payment amount
-//! violated if paymentReceiver == msg.sender && paymentToken == asset
 rule check_balanceOfBuyerIsReducedByPaymentAmount() {
 	env e;
 	constructorAssumptions(e);
@@ -222,7 +218,6 @@ rule check_balanceOfBuyerIsReducedByPaymentAmount() {
 
 	require(assets.length == 1); // making 1 transfer for simplicity and since we have no loops in CVL
 
-	//! should be in contract in order for this to hold always
 	require(assetsReceiver != feeFlowController); // make sure the receiver is not feeFlowController
 	require(assets[0] != getPaymentToken()); // make sure the asset is not the payment toke
 	require(getPaymentReceiver() != e.msg.sender); // make sure the payment receiver is not the buyer
@@ -235,7 +230,6 @@ rule check_balanceOfBuyerIsReducedByPaymentAmount() {
 }
 
 // Balance of payment receiver is increased by payment amount
-//! violated if paymentReceiver == e.msg.sender
 rule check_balanceOfPaymentReceiverIsIncreasedByPaymentAmount() {
 	env e;
 	constructorAssumptions(e);
@@ -243,7 +237,6 @@ rule check_balanceOfPaymentReceiverIsIncreasedByPaymentAmount() {
 
 	require(assets.length == 1); // making 1 transfer for simplicity and since we have no loops in CVL
 
-	//! should be in contract in order for this to hold always
 	require(assetsReceiver != feeFlowController); // make sure the receiver is not feeFlowController
 	require(assets[0] != getPaymentToken()); // make sure the asset is not the payment token
 	require(getPaymentReceiver() != e.msg.sender); // make sure the payment receiver is not the buyer
@@ -265,7 +258,6 @@ rule check_paymentAmountReturnedOnBuyIsNeverHigherThanMaximumPayout() {
 
 	require(assets.length == 1); // making 1 transfer for simplicity and since we have no loops in CVL
 
-	//! should be in contract in order for this to hold always
 	require(assetsReceiver != feeFlowController); // make sure the receiver is not feeFlowController
 	require(assets[0] != getPaymentToken()); // make sure the asset is not the payment token
 	require(getPaymentReceiver() != e.msg.sender); // make sure the payment receiver is not the buyer
