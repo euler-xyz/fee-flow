@@ -3,7 +3,8 @@
 name: Certora verification
 
 on:
-  push: {}
+  pull_request:
+    types: [synchronize]
   workflow_dispatch: {}
 
 jobs:
@@ -59,7 +60,8 @@ jobs:
         run: >
           message="$(git log -n 1 --pretty=format:'CI_${{matrix.params.name}}_%h')";
             ./formal-verification/run.sh ${{ matrix.params.command }} \
-            --msg "$(echo $message | sed 's/[^a-zA-Z0-9., _-]/ /g')"
+            --msg "$(echo $message | sed 's/[^a-zA-Z0-9., _-]/ /g')" \
+            
         env:
           # For this to work, you must set your CERTORAKEY secret on the GitHub
           # website (settings > secrets > actions > new repository secret)
