@@ -57,7 +57,7 @@ jobs:
       # listed in the `params` section below.
       - name: Verify rule ${{ matrix.params.name }}
         run: >
-          message="$(git log -n 1 --pretty=format:'CI_${{matrix.params.name}}_%h....%s')";
+          message="$(git log -n 1 --pretty=format:'CI_${{matrix.params.name}}_%h')";
             ./formal-verification/run.sh ${{ matrix.params.command }} \
             --msg "$(echo $message | sed 's/[^a-zA-Z0-9., _-]/ /g')"
         env:
