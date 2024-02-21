@@ -6,13 +6,15 @@ on:
   pull_request:
     types: [synchronize]
   workflow_dispatch: {}
+permissions:
+  contents: read
 
 jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
       # check out the current version
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
             submodules: recursive
 
