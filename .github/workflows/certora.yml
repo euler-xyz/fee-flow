@@ -4,7 +4,7 @@ name: Certora verification
 
 on:
   pull_request:
-    types: [synchronize]
+    types: [opened, synchronize, reopened, edited]
   workflow_dispatch: {}
 permissions:
   contents: read
@@ -16,11 +16,17 @@ jobs:
       # check out the current version
       - uses: actions/checkout@v4
         with:
-            token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Submodules recursive
+      - name: Install foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+      - name: Run foundry install
         run: |
-          git submodule update --init --recursive
+          forge --version\
+          forge install
+        id: foundry
 
       # install Certora dependencies and CLI
       - name: Install python
