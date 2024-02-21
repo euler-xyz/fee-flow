@@ -6,8 +6,6 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, edited]
   workflow_dispatch: {}
-permissions:
-  contents: read
 
 jobs:
   verify:
@@ -24,7 +22,7 @@ jobs:
           version: nightly
       - name: Run foundry install
         run: |
-          forge --version\
+          forge --version
           forge install
         id: foundry
 
