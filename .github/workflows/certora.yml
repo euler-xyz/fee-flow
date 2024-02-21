@@ -6,6 +6,8 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, edited]
   workflow_dispatch: {}
+permissions:
+  contents: read
 
 jobs:
   verify:
@@ -15,16 +17,17 @@ jobs:
       - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          recursive: true
 
-      - name: Install foundry
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: nightly
-      - name: Run foundry install
-        run: |
-          forge --version
-          forge install
-        id: foundry
+      # - name: Install foundry
+      #   uses: foundry-rs/foundry-toolchain@v1
+      #   with:
+      #     version: nightly
+      # - name: Run foundry install
+      #   run: |
+      #     forge --version
+      #     forge install
+      #   id: foundry
 
       # install Certora dependencies and CLI
       - name: Install python
