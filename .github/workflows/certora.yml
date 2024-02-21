@@ -16,6 +16,7 @@ jobs:
       # check out the current version
       - uses: actions/checkout@v4
         with:
+            token: ${{ secrets.GITHUB_TOKEN }}
             submodules: recursive
 
       # install Certora dependencies and CLI
