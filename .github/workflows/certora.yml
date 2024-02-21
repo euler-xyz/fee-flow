@@ -14,11 +14,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # check out the current version
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           submodules: true
-
       # - name: Install foundry
       #   uses: foundry-rs/foundry-toolchain@v1
       #   with:
