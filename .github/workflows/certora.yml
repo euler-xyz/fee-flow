@@ -3,7 +3,9 @@
 name: Certora verification
 
 on:
-  push: {}
+  pull_request:
+    types:
+      - "synchronize"
   workflow_dispatch: {}
 permissions:
   contents: read
@@ -17,6 +19,10 @@ jobs:
         with:
             token: ${{ secrets.GITHUB_TOKEN }}
             submodules: recursive
+
+      - name: Submodules recursive
+        run: |
+          git submodule update --init --recursive
 
       # install Certora dependencies and CLI
       - name: Install python
