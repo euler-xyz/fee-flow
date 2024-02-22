@@ -3,7 +3,8 @@
 name: Certora verification
 
 on:
-  push: {}
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
   workflow_dispatch: {}
 permissions:
   contents: read
@@ -15,8 +16,8 @@ jobs:
       # check out the current version
       - uses: actions/checkout@v4
         with:
-            token: ${{ secrets.GITHUB_TOKEN }}
-            submodules: recursive
+          token: ${{ secrets.GITHUB_TOKEN }}
+          submodules: true
 
       # install Certora dependencies and CLI
       - name: Install python

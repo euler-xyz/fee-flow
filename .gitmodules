@@ -1,9 +1,9 @@
 [submodule "lib/forge-std"]
 	path = lib/forge-std
-	url = https://github.com/foundry-rs/forge-std@ae570fec082bfe1c1f45b0acca4a2b4f84d345ce
+	url = https://github.com/foundry-rs/forge-std
 [submodule "lib/solmate"]
 	path = lib/solmate
-	url = https://github.com/transmissions11/solmate@c892309933b25c03d32b1b0d674df7ae292ba925
+	url = https://github.com/transmissions11/solmate
 [submodule "lib/ethereum-vault-connector"]
 	path = lib/ethereum-vault-connector
-	url = https://github.com/euler-xyz/ethereum-vault-connector@659d31512f259d6744ec5129841bbeefe285651b
+	url = https://github.com/euler-xyz/ethereum-vault-connector
