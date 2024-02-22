@@ -67,9 +67,10 @@ function initialStateAssertions(env e) {
 	assert e.block.timestamp >= startTime, "e.block.timestamp >= startTime";
 }
 
-function requirementsForBuyExecution(env e, address[] assets, address assetsReceiver, uint256 deadline, uint256 maxPaymentTokenAmount) {
+function requirementsForSuccessfulBuyExecution(env e, address[] assets, address assetsReceiver,uint256 epochId, uint256 deadline, uint256 maxPaymentTokenAmount) {
 	reentrancyMock(); // this sets the lock to the correct initial value
 	uint256 initPriceStart = getInitPrice();
+	require(epochId == getEpochId());
 	require(maxPaymentTokenAmount > initPriceStart);
 	require(e.block.timestamp <= deadline);
 	uint256 paymentAmount = getPrice(e);
@@ -100,6 +101,10 @@ persistent ghost bool reentrancy_happened {
     init_state axiom !reentrancy_happened;
 }
 
+persistent ghost bool reverted {
+	init_state axiom !reverted;
+}
+
 hook CALL(uint g, address addr, uint value, uint argsOffset, uint argsLength, 
           uint retOffset, uint retLength) uint rc {
     if (addr == currentContract) {
@@ -108,12 +113,16 @@ hook CALL(uint g, address addr, uint value, uint argsOffset, uint argsLength,
     }
 }
 
+hook REVERT(uint offset, uint size) {
+	reverted = true;
+}
 
 // Invariants
 // NOTE: we are executing optimistic dispatches for the ERC20 tokens
-invariant invariant_no_reentrant_calls() !reentrancy_happened;
+invariant invariant_no_reentrant_calls() !reentrancy_happened || reentrancy_happened && reverted;
 invariant invariant_init_price_must_be_in_range() getInitPrice() >= getMinInitPrice() && getInitPrice() <= getABS_MAX_INIT_PRICE();
 invariant invariant_price_must_be_below_max_init_price(env e) getPrice(e) <= getInitPrice();
+
 
 // Rules
 rule reachability(method f)
@@ -124,7 +133,7 @@ rule reachability(method f)
 	satisfy true, "a non-reverting path through this method was found";
 }
 
-rule check_initailStateAssertionsAfterBuy() {
+rule check_constructorAssumptionsSatisfiedAfterBuy() {
 	env e;
 	constructorAssumptions(e);
 	calldataarg args;
@@ -135,9 +144,9 @@ rule check_initailStateAssertionsAfterBuy() {
 rule check_buyNeverRevertsUnexpectedly() {
 	env e;
 	constructorAssumptions(e);
-	address[] assets; address assetsReceiver; uint256 deadline; uint256 maxPaymentTokenAmount;
-	requirementsForBuyExecution(e, assets, assetsReceiver, deadline, maxPaymentTokenAmount);
-	buy@withrevert(e, assets, assetsReceiver, deadline, maxPaymentTokenAmount);
+	address[] assets; address assetsReceiver; uint256 epochId; uint256 deadline; uint256 maxPaymentTokenAmount;
+	requirementsForSuccessfulBuyExecution(e, assets, assetsReceiver, epochId, deadline, maxPaymentTokenAmount);
+	buy@withrevert(e, assets, assetsReceiver, epochId, deadline, maxPaymentTokenAmount);
 	assert !lastReverted, "buy never reverts with arithmetic exceptions or internal solidity reverts";
 }
 
@@ -145,9 +154,9 @@ rule check_buyNextInitPriceAtLeastBuyPriceTimesMultiplier() {
 	env e;
 	constructorAssumptions(e);
 	calldataarg args;
-	address[] assets; address assetsReceiver; uint256 deadline; uint256 maxPaymentTokenAmount;
-	requirementsForBuyExecution(e, assets, assetsReceiver, deadline, maxPaymentTokenAmount);
-	mathint paymentAmount = buy@withrevert(e, assets, assetsReceiver, deadline, maxPaymentTokenAmount);
+	address[] assets; address assetsReceiver; uint256 epochId; uint256 deadline; uint256 maxPaymentTokenAmount;
+	requirementsForSuccessfulBuyExecution(e, assets, assetsReceiver, epochId, deadline, maxPaymentTokenAmount);
+	mathint paymentAmount = buy@withrevert(e, assets, assetsReceiver, epochId, deadline, maxPaymentTokenAmount);
 
 	mathint priceMultiplier = getPriceMultiplier();
 	mathint PRICE_MULTIPLIER_SCALE = getPRICE_MULTIPLIER_SCALE();
@@ -165,4 +174,109 @@ rule check_buyNextInitPriceAtLeastBuyPriceTimesMultiplier() {
 			assert initPriceAfter == predictedInitPrice, "initPrice == paymentAmount * priceMultiplier / PRICE_MULTIPLIER_SCALE";
 		}
 	}
+}
+
+// Balance of fee flow controller of a bought asset is always 0 after buy
+rule check_feeFlowControllerTokenBalanceOfAfterBuy() {
+	env e;
+	constructorAssumptions(e);
+	address[] assets; address assetsReceiver; uint256 epochId; uint256 deadline; uint256 maxPaymentTokenAmount;
+
+	require(assets.length == 1); // making 1 transfer for simplicity and since we have no loops in CVL
+	require(assetsReceiver != feeFlowController); // make sure the receiver is not feeFlowController
+
+	buy(e, assets, assetsReceiver, epochId, deadline, maxPaymentTokenAmount);
+	uint256 feeControllerTokenBalance = feeFlowController.getTokenBalanceOf(e, assets[0], feeFlowController);
+	assert feeControllerTokenBalance == 0, "feeFlowController.getTokenBalanceOf(assets[0], feeFlowController) == 0";
+}
+
+// Balance of asset receiver is incremented by balance of fee flow controller after buy
+rule check_balanceOfAssetsReceiverIsIncrementedByFeeFlowControllerTokenBalanceOfAfterBuy() {
+	env e;
+	constructorAssumptions(e);
+	address[] assets; address assetsReceiver; uint256 epochId; uint256 deadline; uint256 maxPaymentTokenAmount;
+
+	require(assets.length == 1); // making 1 transfer for simplicity and since we have no loops in CVL
+
+	require(assetsReceiver != feeFlowController); // make sure the receiver is not feeFlowController
+	require(assets[0] != getPaymentToken()); // make sure the asset is not the payment token
+
+	uint256 assetReceiverTokenBalance = feeFlowController.getTokenBalanceOf(e, assets[0], assetsReceiver);
+	uint256 feeControllerTokenBalance = feeFlowController.getTokenBalanceOf(e, assets[0], feeFlowController);
+	uint256 assetReceiverTokenBalanceAfterPredicted = require_uint256(feeControllerTokenBalance + assetReceiverTokenBalance);
+
+	buy(e, assets, assetsReceiver, epochId, deadline, maxPaymentTokenAmount);
+
+	assert feeFlowController.getTokenBalanceOf(e, assets[0], assetsReceiver) == assetReceiverTokenBalanceAfterPredicted, "feeFlowController.getTokenBalanceOf(assets[0], assetsReceiver) == assetReceiverTokenBalanceAfter";
+}
+
+// Balance of buyer is reduced by payment amount, and never by more than max payment amount
+rule check_balanceOfBuyerIsReducedByPaymentAmount() {
+	env e;
+	constructorAssumptions(e);
+	address[] assets; address assetsReceiver; uint256 epochId; uint256 deadline; uint256 maxPaymentTokenAmount;
+
+	require(assets.length == 1); // making 1 transfer for simplicity and since we have no loops in CVL
+
+	require(assetsReceiver != feeFlowController); // make sure the receiver is not feeFlowController
+	require(assets[0] != getPaymentToken()); // make sure the asset is not the payment toke
+	require(getPaymentReceiver() != e.msg.sender); // make sure the payment receiver is not the buyer
+
+	uint256 paymentAmount = getPrice(e);
+	uint256 balanceBefore = feeFlowController.getPaymentTokenBalanceOf(e, e.msg.sender);
+	buy(e, assets, assetsReceiver, epochId, deadline, maxPaymentTokenAmount);
+	uint256 balanceAfter = feeFlowController.getPaymentTokenBalanceOf(e, e.msg.sender);
+	assert to_mathint(balanceAfter) == (balanceBefore - paymentAmount), "msg.sender (PaymentToken) => balanceAfter == (balanceBefore - paymentAmount)";
+}
+
+// Balance of payment receiver is increased by payment amount
+rule check_balanceOfPaymentReceiverIsIncreasedByPaymentAmount() {
+	env e;
+	constructorAssumptions(e);
+	address[] assets; address assetsReceiver; uint256 epochId; uint256 deadline; uint256 maxPaymentTokenAmount;
+
+	require(assets.length == 1); // making 1 transfer for simplicity and since we have no loops in CVL
+
+	require(assetsReceiver != feeFlowController); // make sure the receiver is not feeFlowController
+	require(assets[0] != getPaymentToken()); // make sure the asset is not the payment token
+	require(getPaymentReceiver() != e.msg.sender); // make sure the payment receiver is not the buyer
+
+	uint256 paymentAmount = getPrice(e);
+	address paymentReceiver = getPaymentReceiver();
+
+	uint256 balanceBefore = feeFlowController.getPaymentTokenBalanceOf(e, paymentReceiver);
+	buy(e, assets, assetsReceiver, epochId, deadline, maxPaymentTokenAmount);
+	uint256 balanceAfter = feeFlowController.getPaymentTokenBalanceOf(e, paymentReceiver);
+	assert to_mathint(balanceAfter) == (balanceBefore + paymentAmount), "paymentReceiver (PaymentToken) => balanceAfter == (balanceBefore + paymentAmount)";
+}
+
+// Payment amount returned on buy is never higher than maximum payout
+rule check_paymentAmountReturnedOnBuyIsNeverHigherThanMaximumPayout() {
+	env e;
+	constructorAssumptions(e);
+	address[] assets; address assetsReceiver; uint256 epochId; uint256 deadline; uint256 maxPaymentTokenAmount;
+
+	require(assets.length == 1); // making 1 transfer for simplicity and since we have no loops in CVL
+
+	require(assetsReceiver != feeFlowController); // make sure the receiver is not feeFlowController
+	require(assets[0] != getPaymentToken()); // make sure the asset is not the payment token
+	require(getPaymentReceiver() != e.msg.sender); // make sure the payment receiver is not the buyer
+
+	uint256 paymentAmount = getPrice(e);
+	uint256 balanceBefore = feeFlowController.getPaymentTokenBalanceOf(e, assetsReceiver);
+	buy(e, assets, assetsReceiver, epochId, deadline, maxPaymentTokenAmount);
+	uint256 balanceAfter = feeFlowController.getPaymentTokenBalanceOf(e, assetsReceiver);
+	assert paymentAmount <= maxPaymentTokenAmount, "paymentAmount <= maxPaymentTokenAmount";
+	assert to_mathint(balanceAfter) <= (balanceBefore + maxPaymentTokenAmount), "balanceAfter <= (balanceBefore + maxPaymentTokenAmount)";
+}
+
+// Epoch Id is always incremented by 1 after buy (and becomes 0 if it reaches max uint16)
+rule check_epochIdAlwaysIncrementedBy1AfterBuy() {
+	env e;
+	constructorAssumptions(e);
+	address[] assets; address assetsReceiver; uint256 epochId; uint256 deadline; uint256 maxPaymentTokenAmount;
+	uint256 epochIdBefore = getEpochId();
+	buy(e, assets, assetsReceiver, epochId, deadline, maxPaymentTokenAmount);
+	uint256 epochIdAfter = getEpochId();
+	assert (epochIdAfter == 0 && epochIdBefore == max_uint16) || epochIdAfter == assert_uint256(epochIdBefore + 1), "epochIdAfter == (epochIdBefore + 1) || (epochIdAfter == 0 && epochIdBefore == 65535)";
 }
