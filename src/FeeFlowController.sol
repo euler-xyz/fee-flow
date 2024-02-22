@@ -122,7 +122,7 @@ contract FeeFlowController is MinimalEVCClient {
             paymentToken.safeTransferFrom(sender, paymentReceiver, paymentAmount);
         }
 
-        for(uint256 i = 0; i < assets.length; i++) {
+        for(uint256 i = 0; i < assets.length; ++i) {
             // Transfer full balance to buyer
             uint256 balance = ERC20(assets[i]).balanceOf(address(this));
             ERC20(assets[i]).safeTransfer(assetsReceiver, balance);
