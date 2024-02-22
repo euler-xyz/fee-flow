@@ -42,8 +42,8 @@ jobs:
       - name: Install solc
         run: |
           pip install solc-select
-          solc-select install 0.8.20
-          solc-select use 0.8.20
+          solc-select install 0.8.24
+          solc-select use 0.8.24
         # It is also possible to download the solc binaries directly
         # wget https://github.com/ethereum/solidity/releases/download/v0.8.0/solc-static-linux
         # sudo mv solc-static-linux /usr/local/bin/solc8.0
