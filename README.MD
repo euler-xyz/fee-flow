@@ -1,6 +1,6 @@
 # Fee Flow
 
-Efficient, decentralised and MEV resistant mechanism to convcert fee assets to a single token. Powered by a continous auto adjusting Dutch auction mechanism.
+Efficient, decentralised and MEV resistant mechanism to convert fee assets to a single token. Powered by a continuous auto-adjusting Dutch auction mechanism.
 
 For more information, refer to the [whitepaper](docs/whitepaper.md)
 
