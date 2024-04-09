@@ -17,7 +17,7 @@ forge coverage --report lcov && genhtml lcov.info --branch-coverage --output-dir
 
 ## Security
 
-Fee Flow has been audited by Zellic, Ottersec and Team Omega. You can find the audit reports [here](audits/)
+Fee Flow has been audited by Zellic, Ottersec and Team Omega. You can find the audit reports [here](audits/).
 
 **No warranties are provided** and **no liability will be accepted for any loss** incurred through the use of this codebase.
 
