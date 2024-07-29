@@ -62,7 +62,7 @@ contract FeeFlowControllerTest is Test {
 
     function testConstructor() public {
         FeeFlowController.Slot0 memory slot0 = feeFlowController.getSlot0();
-        assertEq(address(feeFlowController.evc()), address(evc));
+        assertEq(address(feeFlowController.EVC()), address(evc));
         assertEq(slot0.initPrice, uint128(INIT_PRICE));
         assertEq(slot0.startTime, block.timestamp);
         assertEq(address(feeFlowController.paymentToken()), address(paymentToken));

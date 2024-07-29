@@ -3,14 +3,14 @@ pragma solidity 0.8.24;
 
 import {ERC20} from "solmate/tokens/ERC20.sol";
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
-import {MinimalEVCClient} from "./MinimalEVCClient.sol";
+import {EVCUtil} from "evc/utils/EVCUtil.sol";
 
 
 
 /// @title FeeFlowController
 /// @author Euler Labs (https://eulerlabs.com)
 /// @notice Continous back to back dutch auctions selling any asset received by this contract
-contract FeeFlowController is MinimalEVCClient {
+contract FeeFlowController is EVCUtil {
     using SafeTransferLib for ERC20;
 
     uint256 constant public MIN_EPOCH_PERIOD = 1 hours;
@@ -73,7 +73,7 @@ contract FeeFlowController is MinimalEVCClient {
     /// @param priceMultiplier_ The multiplier for adjusting the price from one epoch to the next.
     /// @param minInitPrice_ The minimum allowed initial price for an epoch.
     /// @notice This constructor performs parameter validation and sets the initial values for the contract.
-    constructor(address evc, uint256 initPrice, address paymentToken_, address paymentReceiver_, uint256 epochPeriod_, uint256 priceMultiplier_, uint256 minInitPrice_) MinimalEVCClient(evc) {
+    constructor(address evc, uint256 initPrice, address paymentToken_, address paymentReceiver_, uint256 epochPeriod_, uint256 priceMultiplier_, uint256 minInitPrice_) EVCUtil(evc) {
         if(initPrice < minInitPrice_) revert InitPriceBelowMin();
         if(initPrice > ABS_MAX_INIT_PRICE) revert InitPriceExceedsMax();
         if(epochPeriod_ < MIN_EPOCH_PERIOD) revert EpochPeriodBelowMin();
