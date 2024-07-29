@@ -29,5 +29,4 @@ contract MinimalEVCClientTest is Test {
         address sender = client.getSender();
         assertEq(sender, onBehalfOf);
     }
-    
 }
