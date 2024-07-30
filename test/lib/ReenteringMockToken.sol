@@ -7,32 +7,21 @@ contract ReenteringMockToken is MockToken {
     address public reenterTarget;
     bytes public reenterData;
 
-    constructor(
-        string memory name_,
-        string memory symbol_
-    ) MockToken(name_, symbol_) {}
+    constructor(string memory name_, string memory symbol_) MockToken(name_, symbol_) {}
 
-    function setReenterTargetAndData(
-        address reenterTarget_,
-        bytes memory reenterData_
-    ) external {
+    function setReenterTargetAndData(address reenterTarget_, bytes memory reenterData_) external {
         reenterTarget = reenterTarget_;
         reenterData = reenterData_;
     }
 
-    function transfer(
-        address recipient,
-        uint256 amount
-    ) public override returns (bool) {
+    function transfer(address recipient, uint256 amount) public override returns (bool) {
         bool success = super.transfer(recipient, amount);
 
-        if(reenterTarget == address(0)) {
+        if (reenterTarget == address(0)) {
             return success;
         }
 
-        (bool reenterSuccess, bytes memory data) = reenterTarget.call(
-            reenterData
-        );
+        (bool reenterSuccess, bytes memory data) = reenterTarget.call(reenterData);
         if (!reenterSuccess) {
             // The call failed, bubble up the error data
             if (data.length > 0) {
