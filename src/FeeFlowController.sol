@@ -7,7 +7,7 @@ import {EVCUtil} from "evc/utils/EVCUtil.sol";
 
 /// @title FeeFlowController
 /// @author Euler Labs (https://eulerlabs.com)
-/// @notice Continous back to back dutch auctions selling any asset received by this contract
+/// @notice Continuous back to back dutch auctions selling any asset received by this contract
 contract FeeFlowController is EVCUtil {
     using SafeTransferLib for ERC20;
 
@@ -26,7 +26,7 @@ contract FeeFlowController is EVCUtil {
     uint256 public immutable minInitPrice;
 
     struct Slot0 {
-        uint8 locked; // 1 if locked, 2 if unlocked
+        uint8 locked; // 1 if unlocked, 2 if locked
         uint16 epochId; // intentionally overflowable
         uint192 initPrice;
         uint40 startTime;
