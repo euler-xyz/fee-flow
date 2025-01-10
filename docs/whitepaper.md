@@ -42,4 +42,4 @@ Fee Flow is very flexible. It is agnostic to the underlying protocol it accrues 
 
 ## References
 
-[1] 2020. *Stop Burning Tokens – Buyback And Make Instead*. Joel Monegro, Placeholder.vc. https://www.placeholder.vc/blog/2020/9/17/stop-burning-tokens-buyback-and-make-instefad.
+[1] 2020. *Stop Burning Tokens – Buyback And Make Instead*. Joel Monegro, Placeholder.vc. https://www.placeholder.vc/blog/2020/9/17/stop-burning-tokens-buyback-and-make-instead.
