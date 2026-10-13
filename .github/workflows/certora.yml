@@ -1,7 +1,14 @@
 name: Certora verification
 
 on:
+  # Only PRs that can change a proof run it, so dependency and docs PRs don't
+  # wait on the certora environment's approval.
   pull_request:
+    paths:
+      - 'src/**'
+      - 'formal-verification/**'
+      - 'lib/**'
+      - '.github/workflows/certora.yml'
   workflow_dispatch: {}
 permissions:
   contents: read
